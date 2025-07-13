@@ -16,15 +16,20 @@ This implementation plan addresses all 230+ requirements across 4 phases, from c
 **Requirements**: REQ-031 to REQ-040, REQ-017 to REQ-020  
 **Success Criteria**: WebSocket streaming with 10k+ events/second
 
-### Phase 3: Production Hardening 🛡️
+### Phase 3: AI Integration 🧠
+**Target Timeline**: 4-5 weeks  
+**Requirements**: REQ-200 to REQ-220  
+**Success Criteria**: Real-time technical indicators and market analysis
+
+### Phase 4: RAG Integration 🤖
+**Target Timeline**: 3-4 weeks  
+**Requirements**: REQ-221 to REQ-230  
+**Success Criteria**: Vector embeddings and RAG-ready data pipeline
+
+### Phase 5: Production Hardening 🛡️
 **Target Timeline**: 2-3 weeks  
 **Requirements**: REQ-081 to REQ-100, Security & Monitoring  
 **Success Criteria**: Production-ready deployment with 99.9% uptime
-
-### Phase 4: AI Integration 🧠
-**Target Timeline**: 6-8 weeks  
-**Requirements**: REQ-200 to REQ-230  
-**Success Criteria**: Real-time technical indicators and RAG integration
 
 ---
 
@@ -231,9 +236,173 @@ type Pipeline struct {
 
 ---
 
-## Phase 3: Production Hardening Implementation
+## Phase 3: AI Integration Implementation
 
-### 3.1 Monitoring & Health Checks (Week 7)
+### 3.1 Technical Indicators Engine (Week 7-8)
+
+#### Indicator Library
+```go
+// REQ-206 to REQ-210
+internal/indicators/
+├── trend.go         # SMA, EMA, MACD
+├── momentum.go      # RSI, Stochastic, Williams %R
+├── volatility.go    # Bollinger Bands, ATR
+├── volume.go        # Volume MA, VWAP, OBV
+└── cache.go         # Indicator caching system
+```
+
+**Indicator Categories:**
+- **REQ-206**: Trend indicators (SMA, EMA, MACD)
+- **REQ-207**: Momentum indicators (RSI, Stochastic)
+- **REQ-208**: Volatility indicators (Bollinger Bands, ATR)
+- **REQ-209**: Volume indicators (VWAP, OBV)
+- **REQ-210**: Performance-optimized caching
+
+### 3.2 Market Context Analysis (Week 9-10)
+
+#### Pattern Recognition
+```go
+// REQ-211 to REQ-215
+internal/analysis/
+├── candlestick.go   # Candlestick pattern detection
+├── chart.go         # Chart pattern recognition
+├── regime.go        # Market regime identification
+├── support.go       # Support/resistance levels
+└── trend.go         # Trend strength analysis
+```
+
+**Analysis Features:**
+- **REQ-211**: Candlestick patterns (doji, hammer, etc.)
+- **REQ-212**: Chart patterns (breakouts, reversals)
+- **REQ-213**: Market regime detection
+- **REQ-214**: Dynamic support/resistance
+- **REQ-215**: Trend strength assessment
+
+### 3.3 Enriched Candle Pipeline (Week 11)
+
+#### AI-Ready Data Structure
+```go
+// REQ-200 to REQ-205
+type EnrichedCandle struct {
+    // Basic OHLCV
+    OHLCV           Candle              `json:"ohlcv"`
+    
+    // Technical Indicators
+    Indicators      IndicatorSet        `json:"indicators"`
+    
+    // Market Context
+    Context         MarketContext       `json:"context"`
+    
+    // ML Features
+    Features        FeatureVector       `json:"features"`
+    
+    // Enrichment Metadata
+    ProcessedAt     time.Time           `json:"processed_at"`
+    Confidence      float64             `json:"confidence"`
+    Metadata        map[string]string   `json:"metadata"`
+}
+```
+
+**Enrichment Pipeline:**
+1. **Base Candle** → Technical Indicators
+2. **Indicators** → Market Context Analysis
+3. **Context** → Feature Vector Generation
+4. **Features** → Confidence Scoring
+5. **Validation** → Quality Assurance
+
+---
+
+## Phase 4: RAG Integration Implementation
+
+### 4.1 Vector Preparation & Context Generation (Week 12)
+
+#### RAG Data Pipeline
+```go
+// REQ-221 to REQ-225
+internal/rag/
+├── embeddings.go    # Vector embedding preparation
+├── context.go       # Context text generation
+├── metadata.go      # Searchable metadata
+├── normalizer.go    # Feature normalization
+└── export.go        # Batch export for training
+```
+
+**RAG Features:**
+- **REQ-221**: Vector database preparation
+- **REQ-222**: Feature normalization (0-1 range)
+- **REQ-223**: Comprehensive context text generation
+- **REQ-224**: Searchable metadata filtering
+- **REQ-225**: Batch export for model training
+
+### 4.2 Human-Readable Descriptions (Week 13)
+
+#### Market Narrative Generation
+```go
+// REQ-226 to REQ-230
+internal/narrative/
+├── generator.go     # Market description generator
+├── templates.go     # Description templates
+├── formatter.go     # Output formatting
+└── validator.go     # Content validation
+```
+
+**Narrative Features:**
+- **REQ-226**: Real-time market descriptions
+- **REQ-227**: Technical analysis summaries
+- **REQ-228**: Pattern recognition explanations
+- **REQ-229**: Context-aware narratives
+- **REQ-230**: Multi-format output (JSON, text, markdown)
+
+Example enriched candle with RAG integration:
+```go
+type RAGReadyCandle struct {
+    // Core enriched candle
+    EnrichedCandle
+    
+    // RAG-specific fields
+    Description     string              `json:"description"`
+    EmbeddingVector []float64           `json:"embedding_vector"`
+    SearchKeywords  []string            `json:"search_keywords"`
+    TechnicalSummary string             `json:"technical_summary"`
+    PatternExplanation string           `json:"pattern_explanation"`
+}
+```
+
+Example market description:
+```
+AAPL 1-minute candle at 2025-07-12 14:30:00 EST:
+Price: $150.25 (+0.5%), Volume: 1.2M shares
+Technical: RSI(70) overbought, MACD bullish crossover
+Pattern: Hammer formation suggesting reversal
+Trend: Strong uptrend (20-period slope +15°)
+Context: Breaking resistance at $150, high volume confirmation
+Confidence: 85% based on technical indicators alignment
+```
+
+### 4.3 Vector Database Integration (Week 14-15)
+
+#### Embedding Pipeline
+```go
+// Vector database preparation
+internal/vectordb/
+├── client.go        # Vector database client
+├── indexer.go       # Index management
+├── searcher.go      # Similarity search
+└── migrator.go      # Schema migrations
+```
+
+**Vector Features:**
+- Multi-dimensional feature vectors
+- Similarity search capabilities
+- Batch processing for historical data
+- Real-time vector updates
+- Metadata filtering and search
+
+---
+
+## Phase 5: Production Hardening Implementation
+
+### 5.1 Monitoring & Health Checks (Week 16)
 
 #### Observability Stack
 ```go
@@ -252,7 +421,7 @@ internal/monitoring/
 - **REQ-084**: Resource usage monitoring
 - **REQ-085**: Critical failure alerting
 
-### 3.2 Error Handling & Recovery (Week 7-8)
+### 5.2 Error Handling & Recovery (Week 16-17)
 
 #### Resilience Patterns
 ```go
@@ -270,7 +439,7 @@ internal/resilience/
 - **REQ-096**: Panic recovery without crashes
 - **REQ-097**: Automatic reconnection strategies
 
-### 3.3 Security Implementation (Week 8)
+### 5.3 Security Implementation (Week 17)
 
 #### Security Measures
 ```go
@@ -289,7 +458,7 @@ internal/security/
 - **REQ-044**: Environment-based secret management
 - **REQ-045**: HTTPS enforcement
 
-### 3.4 Deployment & Operations (Week 9)
+### 5.4 Deployment & Operations (Week 18)
 
 #### Production Readiness
 ```go
@@ -312,113 +481,6 @@ docker/
 
 ---
 
-## Phase 4: AI Integration Implementation
-
-### 4.1 Technical Indicators Engine (Week 10-11)
-
-#### Indicator Library
-```go
-// REQ-206 to REQ-210
-internal/indicators/
-├── trend.go         # SMA, EMA, MACD
-├── momentum.go      # RSI, Stochastic, Williams %R
-├── volatility.go    # Bollinger Bands, ATR
-├── volume.go        # Volume MA, VWAP, OBV
-└── cache.go         # Indicator caching system
-```
-
-**Indicator Categories:**
-- **REQ-206**: Trend indicators (SMA, EMA, MACD)
-- **REQ-207**: Momentum indicators (RSI, Stochastic)
-- **REQ-208**: Volatility indicators (Bollinger Bands, ATR)
-- **REQ-209**: Volume indicators (VWAP, OBV)
-- **REQ-210**: Performance-optimized caching
-
-### 4.2 Market Context Analysis (Week 12-13)
-
-#### Pattern Recognition
-```go
-// REQ-211 to REQ-215
-internal/analysis/
-├── candlestick.go   # Candlestick pattern detection
-├── chart.go         # Chart pattern recognition
-├── regime.go        # Market regime identification
-├── support.go       # Support/resistance levels
-└── trend.go         # Trend strength analysis
-```
-
-**Analysis Features:**
-- **REQ-211**: Candlestick patterns (doji, hammer, etc.)
-- **REQ-212**: Chart patterns (breakouts, reversals)
-- **REQ-213**: Market regime detection
-- **REQ-214**: Dynamic support/resistance
-- **REQ-215**: Trend strength assessment
-
-### 4.3 Enriched Candle Pipeline (Week 14-15)
-
-#### AI-Ready Data Structure
-```go
-// REQ-200 to REQ-205
-type EnrichedCandle struct {
-    // Basic OHLCV
-    OHLCV           Candle              `json:"ohlcv"`
-    
-    // Technical Indicators
-    Indicators      IndicatorSet        `json:"indicators"`
-    
-    // Market Context
-    Context         MarketContext       `json:"context"`
-    
-    // ML Features
-    Features        FeatureVector       `json:"features"`
-    
-    // RAG Context
-    Description     string              `json:"description"`
-    Metadata        map[string]string   `json:"metadata"`
-    
-    // Vector Embedding Ready
-    EmbeddingVector []float64           `json:"embedding_vector"`
-}
-```
-
-**Enrichment Pipeline:**
-1. **Base Candle** → Technical Indicators
-2. **Indicators** → Market Context Analysis
-3. **Context** → Feature Vector Generation
-4. **Features** → Human-Readable Description
-5. **Description** → Vector Embedding Preparation
-
-### 4.4 Vector Preparation & RAG Integration (Week 16-17)
-
-#### RAG System Support
-```go
-// REQ-221 to REQ-225
-internal/rag/
-├── embeddings.go    # Vector embedding preparation
-├── context.go       # Context text generation
-├── metadata.go      # Searchable metadata
-└── export.go        # Batch export for training
-```
-
-**RAG Features:**
-- **REQ-221**: Vector database preparation
-- **REQ-222**: Feature normalization (0-1 range)
-- **REQ-223**: Comprehensive context text
-- **REQ-224**: Searchable metadata filtering
-- **REQ-225**: Batch export for model training
-
-Example enriched candle description:
-```
-AAPL 1-minute candle at 2025-07-12 14:30:00 EST:
-Price: $150.25 (+0.5%), Volume: 1.2M shares
-Technical: RSI(70) overbought, MACD bullish crossover
-Pattern: Hammer formation suggesting reversal
-Trend: Strong uptrend (20-period slope +15°)
-Context: Breaking resistance at $150, high volume confirmation
-```
-
----
-
 ## 🎯 Success Metrics & Validation
 
 ### Phase 1 Completion Criteria
@@ -436,19 +498,25 @@ Context: Breaking resistance at $150, high volume confirmation
 - [ ] Multi-timeframe aggregation working
 
 ### Phase 3 Completion Criteria
+- [ ] 15+ technical indicators calculated in real-time
+- [ ] Market context analysis operational
+- [ ] Enriched candles generated with <1ms overhead
+- [ ] Pattern recognition working accurately
+- [ ] Support 100+ symbols with enriched streaming
+
+### Phase 4 Completion Criteria
+- [ ] Vector embeddings prepared for RAG systems
+- [ ] Human-readable market descriptions generated
+- [ ] Context text generation operational
+- [ ] Vector database integration complete
+- [ ] Batch export functionality working
+
+### Phase 5 Completion Criteria
 - [ ] Health checks and monitoring operational
 - [ ] Graceful error handling and recovery
 - [ ] Security measures implemented
 - [ ] Production deployment pipeline
 - [ ] 99.9% uptime in staging environment
-
-### Phase 4 Completion Criteria
-- [ ] 15+ technical indicators calculated in real-time
-- [ ] Market context analysis operational
-- [ ] Enriched candles generated with <1ms overhead
-- [ ] Vector embeddings prepared for RAG systems
-- [ ] Human-readable market descriptions generated
-- [ ] Support 100+ symbols with enriched streaming
 
 ---
 
