@@ -15,7 +15,7 @@ go build -ldflags="-s -w" -o bin/server cmd/server/main.go
 
 # Build CLI
 echo "Building CLI..."
-go build -ldflags="-s -w" -o bin/cli cmd/cli/main.go
+go build -ldflags="-s -w" -o bin/cli ./cmd/cli
 
 echo "Build completed successfully!"
 echo "Binaries available in ./bin/"

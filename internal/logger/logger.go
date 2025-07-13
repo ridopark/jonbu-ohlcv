@@ -47,6 +47,41 @@ func InitLogger(level string, environment string) {
 		Msg("Logger initialized")
 }
 
+// New creates a new configured logger instance
+func New(environment, level string) zerolog.Logger {
+	// Set time format
+	zerolog.TimeFieldFormat = time.RFC3339Nano
+
+	// Configure log level
+	logLevel := parseLogLevel(level)
+
+	// Configure output based on environment
+	var logger zerolog.Logger
+
+	if environment == "production" {
+		// JSON output for production
+		logger = zerolog.New(os.Stdout).
+			Level(logLevel).
+			With().
+			Timestamp().
+			Str("service", "jonbu-ohlcv").
+			Logger()
+	} else {
+		// Pretty console output for development
+		logger = zerolog.New(zerolog.ConsoleWriter{
+			Out:        os.Stderr,
+			TimeFormat: time.RFC3339,
+		}).
+			Level(logLevel).
+			With().
+			Timestamp().
+			Str("service", "jonbu-ohlcv").
+			Logger()
+	}
+
+	return logger
+}
+
 // NewContextLogger creates a new logger with context fields
 func NewContextLogger(component string) zerolog.Logger {
 	return log.With().

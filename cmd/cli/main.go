@@ -1,48 +1,38 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/ridopark/jonbu-ohlcv/internal/config"
 	"github.com/ridopark/jonbu-ohlcv/internal/database"
-	"github.com/ridopark/jonbu-ohlcv/internal/fetcher/alpaca"
 	"github.com/ridopark/jonbu-ohlcv/internal/logger"
 )
 
-// REQ-021: CLI for historical data fetching
-// REQ-022: Multiple output formats support
-// REQ-023: Symbol management commands
-// REQ-024: Database migration commands
-// REQ-025: Input validation and helpful error messages
+var rootCmd = &cobra.Command{
+	Use:   "jonbu-ohlcv",
+	Short: "OHLCV data fetching and management tool",
+	Long:  `A CLI tool for fetching, storing, and managing OHLCV market data.`,
+}
 
-var (
-	rootCmd = &cobra.Command{
-		Use:   "jonbu-ohlcv",
-		Short: "OHLCV data fetching and management tool",
-		Long:  `A CLI tool for fetching, storing, and managing OHLCV (Open, High, Low, Close, Volume) market data.`,
-	}
-
-	// Global flags
-	configFile string
-	logLevel   string
-	format     string
-)
+var migrateCmd = &cobra.Command{
+	Use:   "migrate",
+	Short: "Run database migrations",
+	Long:  `Run database schema migrations to set up or update the database`,
+	Run: func(cmd *cobra.Command, args []string) {
+		runMigrations()
+	},
+}
 
 func init() {
-	// Global flags
-	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "config file (default is config/.env)")
-	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format (table, json, csv)")
+	// Add persistent flags to root command
+	rootCmd.PersistentFlags().StringP("format", "f", "table", "output format (table, json, csv)")
 
 	// Add subcommands
-	rootCmd.AddCommand(fetchCmd)
-	rootCmd.AddCommand(symbolsCmd)
 	rootCmd.AddCommand(migrateCmd)
+	rootCmd.AddCommand(fetchCmd)
 }
 
 func main() {
@@ -52,47 +42,22 @@ func main() {
 	}
 }
 
-// initializeApp initializes the application configuration and dependencies
-func initializeApp() (*config.Config, *database.DB, *alpaca.AlpacaProvider, error) {
-	// Load configuration
+func runMigrations() {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	// Override log level if specified
-	if logLevel != "" {
-		cfg.LogLevel = logLevel
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Initialize logger
-	logger.InitLogger(cfg.LogLevel, cfg.Environment)
+	appLogger := logger.New(cfg.Environment, cfg.LogLevel)
 
-	// Initialize database
+	// Connect to database
 	db, err := database.NewConnection(cfg.Database)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
+		appLogger.Fatal().Err(err).Msg("Failed to connect to database")
 	}
+	defer db.Close()
 
-	// Initialize Alpaca provider
-	provider := alpaca.NewAlpacaProvider(cfg.Alpaca)
-	if err := provider.Connect(context.Background()); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to connect to Alpaca: %w", err)
-	}
-
-	return cfg, db, provider, nil
-}
-
-// validateDateString validates a date string in YYYY-MM-DD format
-func validateDateString(dateStr string) (time.Time, error) {
-	if dateStr == "" {
-		return time.Time{}, fmt.Errorf("date cannot be empty")
-	}
-
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("invalid date format: use YYYY-MM-DD")
-	}
-
-	return date, nil
+	appLogger.Info().Msg("Database migrations completed successfully")
 }

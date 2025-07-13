@@ -444,3 +444,35 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Trading signal generation
 
 *Last updated: July 2025*
+
+## Database Management
+
+The project includes both pgAdmin and Adminer for database management:
+
+### pgAdmin (Recommended)
+- **URL**: http://localhost:5050
+- **Email**: admin@jonbu.com  
+- **Password**: admin123
+- **Features**: Full PostgreSQL management, query editor, visual tools
+
+### Adminer (Lightweight)
+- **URL**: http://localhost:8080
+- **Server**: postgres
+- **Username**: postgres
+- **Password**: postgres
+- **Database**: jonbu_ohlcv
+
+### Direct Database Access
+```bash
+# Connect via psql
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d jonbu_ohlcv
+
+# View tables
+\dt
+
+# View table structure  
+\d+ ohlcv
+\d+ symbols
+```
+
+## Getting Started

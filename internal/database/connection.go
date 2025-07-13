@@ -142,7 +142,7 @@ func (db *DB) HealthCheck(ctx context.Context) map[string]interface{} {
 
 // buildConnectionString constructs the PostgreSQL connection string
 func buildConnectionString(cfg config.DatabaseConfig) string {
-	return fmt.Sprintf(
+	connStr := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Host,
 		cfg.Port,
@@ -151,6 +151,10 @@ func buildConnectionString(cfg config.DatabaseConfig) string {
 		cfg.Name,
 		cfg.SSLMode,
 	)
+	// Debug: Print connection string (masking password)
+	fmt.Printf("DEBUG: Connecting to database with: host=%s port=%d user=%s dbname=%s sslmode=%s\n",
+		cfg.Host, cfg.Port, cfg.User, cfg.Name, cfg.SSLMode)
+	return connStr
 }
 
 // IsConnectionError checks if an error is a connection-related error

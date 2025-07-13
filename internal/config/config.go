@@ -40,6 +40,7 @@ type AlpacaConfig struct {
 	BaseURL   string `mapstructure:"base_url" validate:"required,url"`
 	WSBaseURL string `mapstructure:"ws_base_url" validate:"required"`
 	IsPaper   bool   `mapstructure:"is_paper"`
+	UseMock   bool   `mapstructure:"use_mock"`
 }
 
 type ServerConfig struct {
@@ -71,6 +72,36 @@ func Load() (*Config, error) {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	// Explicitly bind environment variables for nested structs
+	viper.BindEnv("database.host", "DATABASE_HOST")
+	viper.BindEnv("database.port", "DATABASE_PORT")
+	viper.BindEnv("database.user", "DATABASE_USER")
+	viper.BindEnv("database.password", "DATABASE_PASSWORD")
+	viper.BindEnv("database.name", "DATABASE_NAME")
+	viper.BindEnv("database.ssl_mode", "DATABASE_SSL_MODE")
+	viper.BindEnv("database.max_connections", "DATABASE_MAX_CONNECTIONS")
+	viper.BindEnv("database.max_idle_conns", "DATABASE_MAX_IDLE_CONNS")
+
+	// Alpaca configuration binding
+	viper.BindEnv("alpaca.api_key", "ALPACA_API_KEY")
+	viper.BindEnv("alpaca.secret_key", "ALPACA_SECRET_KEY")
+	viper.BindEnv("alpaca.base_url", "ALPACA_BASE_URL")
+	viper.BindEnv("alpaca.ws_base_url", "ALPACA_WS_BASE_URL")
+	viper.BindEnv("alpaca.is_paper", "ALPACA_IS_PAPER")
+	viper.BindEnv("alpaca.use_mock", "ALPACA_USE_MOCK")
+
+	// Server configuration binding
+	viper.BindEnv("server.http_port", "SERVER_HTTP_PORT")
+	viper.BindEnv("server.websocket_port", "SERVER_WEBSOCKET_PORT")
+	viper.BindEnv("server.host", "SERVER_HOST")
+	viper.BindEnv("server.read_timeout", "SERVER_READ_TIMEOUT")
+	viper.BindEnv("server.write_timeout", "SERVER_WRITE_TIMEOUT")
+
+	// Worker configuration binding
+	viper.BindEnv("worker.buffer_size", "WORKER_BUFFER_SIZE")
+	viper.BindEnv("worker.max_workers_per_symbol", "WORKER_MAX_WORKERS_PER_SYMBOL")
+	viper.BindEnv("worker.aggregation_timeout", "WORKER_AGGREGATION_TIMEOUT")
+
 	// REQ-063: Set sensible defaults
 	setDefaults()
 
@@ -95,12 +126,18 @@ func (c *Config) Validate() error {
 	if c.Database.Port == 0 {
 		return errors.New("database port is required")
 	}
+
+	// Validate Alpaca configuration if streaming is enabled
 	if c.Alpaca.APIKey == "" {
 		return errors.New("alpaca API key is required")
 	}
 	if c.Alpaca.SecretKey == "" {
 		return errors.New("alpaca secret key is required")
 	}
+	if c.Alpaca.BaseURL == "" {
+		return errors.New("alpaca base URL is required")
+	}
+
 	if c.Server.HTTPPort == 0 {
 		return errors.New("HTTP port is required")
 	}
@@ -136,6 +173,7 @@ func setDefaults() {
 	viper.SetDefault("alpaca.base_url", "https://paper-api.alpaca.markets")
 	viper.SetDefault("alpaca.ws_base_url", "wss://stream.data.alpaca.markets")
 	viper.SetDefault("alpaca.is_paper", true)
+	viper.SetDefault("alpaca.use_mock", false)
 
 	// Server defaults
 	viper.SetDefault("server.http_port", 8080)

@@ -12,7 +12,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ridopark/jonbu-ohlcv/internal/config"
 	"github.com/ridopark/jonbu-ohlcv/internal/database"
+	"github.com/ridopark/jonbu-ohlcv/internal/fetcher/alpaca"
+	"github.com/ridopark/jonbu-ohlcv/internal/logger"
 	"github.com/ridopark/jonbu-ohlcv/internal/models"
 )
 
@@ -40,6 +43,46 @@ func init() {
 	fetchCmd.Flags().StringVar(&startDate, "start", "", "start date (YYYY-MM-DD)")
 	fetchCmd.Flags().StringVar(&endDate, "end", "", "end date (YYYY-MM-DD)")
 	fetchCmd.Flags().BoolVar(&store, "store", false, "store data in database")
+}
+
+// validateDateString validates a date string in YYYY-MM-DD format
+func validateDateString(dateStr string) (time.Time, error) {
+	if dateStr == "" {
+		return time.Time{}, fmt.Errorf("date cannot be empty")
+	}
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid date format: use YYYY-MM-DD")
+	}
+
+	return date, nil
+}
+
+// initializeApp initializes application components for the CLI
+func initializeApp() (*config.Config, *database.DB, *alpaca.AlpacaProvider, error) {
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Initialize logger
+	logger.InitLogger(cfg.LogLevel, cfg.Environment)
+
+	// Initialize database
+	db, err := database.NewConnection(cfg.Database)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Initialize Alpaca provider
+	provider := alpaca.NewAlpacaProvider(cfg.Alpaca)
+	if err := provider.Connect(context.Background()); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to connect to Alpaca: %w", err)
+	}
+
+	return cfg, db, provider, nil
 }
 
 func runFetch(cmd *cobra.Command, args []string) error {
@@ -121,8 +164,14 @@ func runFetch(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Successfully stored %d records in database.\n", len(ohlcvs))
 	}
 
+	// Get output format from command flag or use default
+	outputFormat, _ := cmd.Flags().GetString("format")
+	if outputFormat == "" {
+		outputFormat = "table"
+	}
+
 	// Display results
-	return displayOHLCVData(ohlcvs, format)
+	return displayOHLCVData(ohlcvs, outputFormat)
 }
 
 // displayOHLCVData displays OHLCV data in the specified format
