@@ -149,6 +149,65 @@ func (c *Config) String() string {
 
 ### 4. Architecture Compliance
 
+#### Enriched Candle Strategy: On-Demand Calculation (REQ-200-205)
+```go
+// IMPORTANT: Enriched candles are NOT stored in database
+// They are calculated on-demand with <1ms latency for optimal performance
+type BacktestingEngine struct {
+    enricher *enrichment.CandleEnrichmentEngine
+    ohlcvRepo *database.OHLCVRepository
+    logger   zerolog.Logger
+}
+
+func (b *BacktestingEngine) GetEnrichedCandles(symbol string, from, to time.Time) ([]*models.EnrichedCandle, error) {
+    // 1. Fetch raw OHLCV from database (only raw data is stored)
+    ohlcvData, err := b.ohlcvRepo.GetHistory(symbol, from, to)
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch OHLCV data: %w", err)
+    }
+    
+    // 2. Calculate enriched candles on-demand (0.167ms per candle)
+    enriched := make([]*models.EnrichedCandle, 0, len(ohlcvData))
+    for i, candle := range ohlcvData {
+        history := ohlcvData[:i]  // Historical context for indicators
+        
+        enrichedCandle, err := b.enricher.EnrichCandle(ctx, candle, history, nil)
+        if err != nil {
+            b.logger.Warn().Err(err).Str("symbol", symbol).Msg("Failed to enrich candle")
+            continue
+        }
+        
+        enriched = append(enriched, enrichedCandle)
+    }
+    
+    return enriched, nil
+}
+
+// Database Repository: Only store raw OHLCV data
+type OHLCVRepository struct {
+    db *sql.DB
+}
+
+func (r *OHLCVRepository) Insert(ohlcv *models.OHLCV) error {
+    // REQ-013: Store only basic OHLCV data - enrichment calculated on-demand
+    const query = `
+        INSERT INTO ohlcv (symbol, timestamp, open, high, low, close, volume, timeframe)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (symbol, timestamp, timeframe) DO NOTHING`
+    
+    _, err := r.db.Exec(query, ohlcv.Symbol, ohlcv.Timestamp, 
+        ohlcv.Open, ohlcv.High, ohlcv.Low, ohlcv.Close, ohlcv.Volume, ohlcv.Timeframe)
+    return err
+}
+```
+
+**Rationale for On-Demand Strategy:**
+- **Performance**: 0.167ms enrichment latency makes real-time calculation viable
+- **Storage Efficiency**: Avoid 50x storage increase from storing enriched data  
+- **Flexibility**: Easy to modify indicators without schema migrations
+- **Accuracy**: Always use latest enrichment logic for consistent results
+- **Cost**: Minimal computational overhead vs massive storage costs
+
 #### Interface Design (REQ-029)
 ```go
 // Data provider abstraction

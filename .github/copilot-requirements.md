@@ -19,11 +19,12 @@
 - **REQ-010**: System MUST emit completed candles via channels
 
 #### Data Storage
-- **REQ-011**: System MUST store OHLCV data in PostgreSQL database
+- **REQ-011**: System MUST store raw OHLCV data in PostgreSQL database
 - **REQ-012**: System MUST implement database migrations for schema management
 - **REQ-013**: System MUST use prepared statements for optimal performance
 - **REQ-014**: System MUST handle database connection pooling
 - **REQ-015**: System MUST implement proper transaction handling
+- **STORAGE STRATEGY**: Enriched candles are NOT stored in database - calculated on-demand (0.167ms latency)
 
 #### API & Streaming
 - **REQ-016**: System MUST provide REST API endpoints for historical data access
@@ -187,12 +188,12 @@
 - **REQ-219**: System MUST produce contextual text descriptions for RAG retrieval
 - **REQ-220**: System MUST include metadata for filtering and categorization
 
-#### Vector Embedding Preparation
-- **REQ-221**: System MUST prepare candles for vector database storage
-- **REQ-222**: System MUST normalize all numerical features to 0-1 range
-- **REQ-223**: System MUST generate comprehensive context text for semantic search
-- **REQ-224**: System MUST include searchable metadata for filtered retrieval
-- **REQ-225**: System MUST support batch export for model training
+#### Vector Embedding Preparation (On-Demand Processing)
+- **REQ-221**: System MUST prepare candles for vector database export on-demand (not stored)
+- **REQ-222**: System MUST normalize all numerical features to 0-1 range during processing
+- **REQ-223**: System MUST generate comprehensive context text for semantic search on request
+- **REQ-224**: System MUST include searchable metadata for filtered retrieval during export
+- **REQ-225**: System MUST support batch export for model training from raw OHLCV + enrichment
 
 #### Performance & Scalability
 - **REQ-226**: Enriched candle processing MUST NOT impact basic OHLCV latency

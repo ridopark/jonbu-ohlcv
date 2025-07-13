@@ -278,60 +278,66 @@ internal/analysis/
 - **REQ-214**: Dynamic support/resistance
 - **REQ-215**: Trend strength assessment
 
-### 3.3 Enriched Candle Pipeline (Week 11)
+### 3.3 Enriched Candle Pipeline (Week 11) - On-Demand Strategy
 
-#### AI-Ready Data Structure
+#### AI-Ready Data Structure (Calculated On-Demand)
 ```go
-// REQ-200 to REQ-205
+// REQ-200 to REQ-205: Enriched candles calculated in real-time, NOT stored
 type EnrichedCandle struct {
-    // Basic OHLCV
+    // Basic OHLCV (from database)
     OHLCV           Candle              `json:"ohlcv"`
     
-    // Technical Indicators
+    // Technical Indicators (calculated on-demand)
     Indicators      IndicatorSet        `json:"indicators"`
     
-    // Market Context
+    // Market Context (calculated on-demand)
     Context         MarketContext       `json:"context"`
     
-    // ML Features
+    // ML Features (calculated on-demand)
     Features        FeatureVector       `json:"features"`
     
-    // Enrichment Metadata
+    // Enrichment Metadata (processing info)
     ProcessedAt     time.Time           `json:"processed_at"`
     Confidence      float64             `json:"confidence"`
     Metadata        map[string]string   `json:"metadata"`
 }
 ```
 
-**Enrichment Pipeline:**
-1. **Base Candle** → Technical Indicators
-2. **Indicators** → Market Context Analysis
-3. **Context** → Feature Vector Generation
-4. **Features** → Confidence Scoring
-5. **Validation** → Quality Assurance
+**On-Demand Enrichment Pipeline:**
+1. **Fetch Raw OHLCV** → From PostgreSQL database (lightweight)
+2. **Calculate Indicators** → Real-time computation (0.167ms per candle)
+3. **Generate Context** → Market analysis on-demand
+4. **Create Features** → Feature vector generation
+5. **Return Enriched** → To client/backtesting engine
+
+**Storage Strategy Rationale:**
+- **Performance**: 0.167ms enrichment latency makes real-time viable
+- **Storage**: Avoid 50x database size increase from storing enriched data
+- **Flexibility**: Easy indicator modifications without schema changes
+- **Accuracy**: Always use latest enrichment logic for consistency
 
 ---
 
 ## Phase 4: RAG Integration Implementation
 
-### 4.1 Vector Preparation & Context Generation (Week 12)
+### 4.1 Vector Preparation & Context Generation (Week 12) - On-Demand Processing
 
-#### RAG Data Pipeline
+#### RAG Data Pipeline (On-Demand Export)
 ```go
-// REQ-221 to REQ-225
+// REQ-221 to REQ-225: On-demand processing, not persistent storage
 internal/rag/
-├── embeddings.go    # Vector embedding preparation
-├── context.go       # Context text generation
-├── metadata.go      # Searchable metadata
-├── normalizer.go    # Feature normalization
-└── export.go        # Batch export for training
+├── processor.go     # On-demand enrichment for export
+├── context.go       # Context text generation from enriched data
+├── metadata.go      # Searchable metadata generation
+├── normalizer.go    # Feature normalization during export
+└── exporter.go      # Batch export from raw OHLCV + enrichment
 ```
 
-**RAG Features:**
-- **REQ-221**: Vector database preparation
-- **REQ-222**: Feature normalization (0-1 range)
-- **REQ-223**: Comprehensive context text generation
-- **REQ-224**: Searchable metadata filtering
+**RAG Features (On-Demand):**
+- **REQ-221**: Vector export preparation (enriched on-demand from raw OHLCV)
+- **REQ-222**: Feature normalization (0-1 range) during processing
+- **REQ-223**: Context text generation from real-time enrichment
+- **REQ-224**: Searchable metadata filtering during export
 - **REQ-225**: Batch export for model training
 
 ### 4.2 Human-Readable Descriptions (Week 13)
@@ -353,13 +359,32 @@ internal/narrative/
 - **REQ-229**: Context-aware narratives
 - **REQ-230**: Multi-format output (JSON, text, markdown)
 
-Example enriched candle with RAG integration:
+Example on-demand enriched candle for RAG export:
 ```go
+// RAG export function - processes raw OHLCV on-demand
+func (r *RAGExporter) PrepareForExport(ohlcv *models.OHLCV, history []*models.OHLCV) (*RAGReadyCandle, error) {
+    // 1. Enrich candle on-demand (0.167ms)
+    enriched, err := r.enricher.EnrichCandle(ctx, ohlcv, history, nil)
+    if err != nil {
+        return nil, fmt.Errorf("enrichment failed: %w", err)
+    }
+    
+    // 2. Generate RAG-specific fields
+    return &RAGReadyCandle{
+        EnrichedCandle:     *enriched,
+        Description:        r.generateDescription(enriched),
+        EmbeddingVector:    r.generateEmbedding(enriched),
+        SearchKeywords:     r.extractKeywords(enriched),
+        TechnicalSummary:   r.generateSummary(enriched),
+        PatternExplanation: r.explainPatterns(enriched),
+    }, nil
+}
+
 type RAGReadyCandle struct {
-    // Core enriched candle
+    // Core enriched candle (calculated on-demand)
     EnrichedCandle
     
-    // RAG-specific fields
+    // RAG-specific fields (generated for export)
     Description     string              `json:"description"`
     EmbeddingVector []float64           `json:"embedding_vector"`
     SearchKeywords  []string            `json:"search_keywords"`
@@ -379,24 +404,31 @@ Context: Breaking resistance at $150, high volume confirmation
 Confidence: 85% based on technical indicators alignment
 ```
 
-### 4.3 Vector Database Integration (Week 14-15)
+### 4.3 Vector Database Integration (Week 14-15) - Export Pipeline
 
-#### Embedding Pipeline
+#### On-Demand Export Pipeline
 ```go
-// Vector database preparation
+// Vector database export (not persistent storage)
 internal/vectordb/
-├── client.go        # Vector database client
-├── indexer.go       # Index management
-├── searcher.go      # Similarity search
-└── migrator.go      # Schema migrations
+├── exporter.go      # On-demand vector export from raw OHLCV
+├── processor.go     # Batch enrichment for export
+├── formatter.go     # Vector formatting and normalization
+└── validator.go     # Export validation
 ```
 
-**Vector Features:**
-- Multi-dimensional feature vectors
-- Similarity search capabilities
-- Batch processing for historical data
-- Real-time vector updates
-- Metadata filtering and search
+**Export Features (On-Demand Processing):**
+- Fetch raw OHLCV from PostgreSQL database
+- Calculate enriched candles using enrichment engine (0.167ms/candle)
+- Generate multi-dimensional feature vectors on-demand
+- Export to vector database for ML training/inference
+- Batch processing for historical data export
+- Real-time export for streaming applications
+
+**Benefits of On-Demand Approach:**
+- **Storage Efficiency**: No persistent vector storage in primary database
+- **Freshness**: Always export with latest indicator calculations
+- **Flexibility**: Easy to modify export formats and features
+- **Performance**: Sub-millisecond enrichment makes real-time export viable
 
 ---
 
@@ -500,16 +532,16 @@ docker/
 ### Phase 3 Completion Criteria
 - [ ] 15+ technical indicators calculated in real-time
 - [ ] Market context analysis operational
-- [ ] Enriched candles generated with <1ms overhead
+- [ ] Enriched candles generated with <1ms overhead (on-demand, not stored)
 - [ ] Pattern recognition working accurately
-- [ ] Support 100+ symbols with enriched streaming
+- [ ] Support 100+ symbols with on-demand enrichment
 
 ### Phase 4 Completion Criteria
-- [ ] Vector embeddings prepared for RAG systems
+- [ ] Vector export pipeline operational (on-demand processing)
 - [ ] Human-readable market descriptions generated
 - [ ] Context text generation operational
-- [ ] Vector database integration complete
-- [ ] Batch export functionality working
+- [ ] Batch export functionality for ML training
+- [ ] On-demand enrichment integration complete
 
 ### Phase 5 Completion Criteria
 - [ ] Health checks and monitoring operational
@@ -542,6 +574,31 @@ docker/
 - **Performance Monitoring**: Early detection of performance regressions
 - **External Dependencies**: Circuit breakers for API failures
 - **Data Integrity**: Comprehensive validation at all boundaries
+
+## 📊 Architectural Decision: On-Demand Enrichment Strategy
+
+### Decision Summary
+**Storage Strategy**: Store only raw OHLCV data in PostgreSQL. Calculate enriched candles on-demand.
+
+### Rationale
+- **Performance**: 0.167ms enrichment latency makes real-time calculation viable for all use cases
+- **Storage Efficiency**: Avoids 50x database size increase from storing pre-computed enriched data
+- **Flexibility**: Easy to modify indicators and analysis without database schema changes
+- **Cost Effectiveness**: Minimal compute overhead vs massive storage and I/O costs
+- **Data Freshness**: Always uses latest enrichment logic for consistent results
+
+### Implementation Impact
+- **Backtesting**: Fetch raw OHLCV + enrich on-demand during analysis
+- **Real-time Streaming**: Continue current pattern of live enrichment
+- **RAG Export**: Process raw OHLCV through enrichment pipeline for vector database export
+- **Database Schema**: Simplified to core OHLCV tables only
+- **API Performance**: Sub-millisecond enrichment maintains excellent response times
+
+### Trade-offs Considered
+- ✅ **Compute vs Storage**: Chose compute (0.167ms) over storage (50x increase)
+- ✅ **Flexibility vs Performance**: Gained flexibility without sacrificing performance
+- ✅ **Complexity vs Maintenance**: Reduced database complexity, simplified maintenance
+- ✅ **Memory vs Disk**: Better memory utilization, reduced disk I/O
 
 ---
 

@@ -509,6 +509,36 @@ type OHLCV struct {
 - Consider database constraints and indexes for performance
 - Handle connection pooling and timeouts
 
+### Enriched Candle Strategy: On-Demand Calculation
+- **Storage Decision**: Store ONLY raw OHLCV data in PostgreSQL database
+- **Enrichment Strategy**: Calculate enriched candles on-demand with 0.167ms latency
+- **Rationale**: Real-time enrichment is faster than database I/O and avoids 50x storage bloat
+- **Implementation**: Use enrichment engine for backtesting and analysis workflows
+- **Benefits**: Flexible indicators, reduced storage costs, always current logic
+- **Pattern**: Fetch raw OHLCV → Enrich on-demand → Return to client
+
+```go
+// Correct pattern: On-demand enrichment
+func (s *BacktestService) GetEnrichedHistory(symbol string, from, to time.Time) ([]*models.EnrichedCandle, error) {
+    // 1. Fetch raw OHLCV from database (lightweight)
+    ohlcv, err := s.repo.GetOHLCVHistory(symbol, from, to)
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch OHLCV: %w", err)
+    }
+    
+    // 2. Enrich on-demand (0.167ms per candle)
+    enriched := make([]*models.EnrichedCandle, len(ohlcv))
+    for i, candle := range ohlcv {
+        enriched[i], err = s.enricher.EnrichCandle(ctx, candle, ohlcv[:i], nil)
+        if err != nil {
+            return nil, fmt.Errorf("enrichment failed: %w", err)
+        }
+    }
+    
+    return enriched, nil
+}
+```
+
 ### API Design
 - Follow RESTful conventions
 - Use proper HTTP status codes
