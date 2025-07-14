@@ -21,12 +21,17 @@ This implementation plan addresses all 230+ requirements across 4 phases, from c
 **Requirements**: REQ-200 to REQ-220  
 **Success Criteria**: Real-time technical indicators and market analysis
 
-### Phase 4: RAG Integration 🤖
+### Phase 4: Web Frontend Dashboard 🖥️
+**Target Timeline**: 3-4 weeks  
+**Requirements**: REQ-231 to REQ-250  
+**Success Criteria**: Modern React dashboard with real-time charts and CLI functionality
+
+### Phase 5: RAG Integration 🤖
 **Target Timeline**: 3-4 weeks  
 **Requirements**: REQ-221 to REQ-230  
 **Success Criteria**: Vector embeddings and RAG-ready data pipeline
 
-### Phase 5: Production Hardening 🛡️
+### Phase 6: Production Hardening 🛡️
 **Target Timeline**: 2-3 weeks  
 **Requirements**: REQ-081 to REQ-100, Security & Monitoring  
 **Success Criteria**: Production-ready deployment with 99.9% uptime
@@ -318,9 +323,288 @@ type EnrichedCandle struct {
 
 ---
 
-## Phase 4: RAG Integration Implementation
+## Phase 4: Web Frontend Dashboard Implementation
 
-### 4.1 Vector Preparation & Context Generation (Week 12) - On-Demand Processing
+### 4.1 Modern React Application Setup (Week 12)
+
+#### Frontend Technology Stack
+```json
+// REQ-231 to REQ-235: Modern frontend architecture
+{
+  "framework": "React 18+",
+  "language": "TypeScript 5+",
+  "styling": "Tailwind CSS 3+ with Less preprocessor",
+  "charts": "Chart.js / Recharts for real-time OHLCV visualization",
+  "websocket": "Socket.io client for real-time streaming",
+  "state": "Zustand for lightweight state management",
+  "routing": "React Router v6 for SPA navigation",
+  "build": "Vite for fast development and bundling"
+}
+```
+
+#### Project Structure
+```bash
+# REQ-231: Frontend application structure
+web/
+├── src/
+│   ├── components/          # Reusable UI components
+│   │   ├── charts/         # Chart components for OHLCV data
+│   │   ├── forms/          # Form components for CLI operations
+│   │   ├── layout/         # Layout and navigation components
+│   │   └── ui/             # Basic UI components (buttons, inputs)
+│   ├── pages/              # Route-based page components
+│   │   ├── Dashboard.tsx   # Main dashboard with charts
+│   │   ├── Symbols.tsx     # Symbol management interface
+│   │   ├── History.tsx     # Historical data viewer
+│   │   ├── Monitoring.tsx  # Server monitoring and health
+│   │   └── Settings.tsx    # Configuration management
+│   ├── hooks/              # Custom React hooks
+│   │   ├── useWebSocket.ts # WebSocket connection management
+│   │   ├── useOHLCV.ts     # OHLCV data fetching
+│   │   └── useAPI.ts       # REST API integration
+│   ├── stores/             # Zustand state management
+│   │   ├── chartStore.ts   # Chart data and settings
+│   │   ├── symbolStore.ts  # Symbol tracking state
+│   │   └── configStore.ts  # Application configuration
+│   ├── services/           # API and WebSocket services
+│   │   ├── api.ts          # REST API client
+│   │   ├── websocket.ts    # WebSocket client
+│   │   └── types.ts        # TypeScript type definitions
+│   ├── styles/             # Styling and themes
+│   │   ├── globals.less    # Global Less styles
+│   │   ├── components.less # Component-specific styles
+│   │   └── tailwind.css    # Tailwind CSS configuration
+│   └── utils/              # Utility functions
+│       ├── formatters.ts   # Data formatting utilities
+│       └── validators.ts   # Input validation helpers
+├── public/                 # Static assets
+├── package.json           # Dependencies and scripts
+├── tsconfig.json          # TypeScript configuration
+├── tailwind.config.js     # Tailwind CSS configuration
+├── vite.config.ts         # Vite build configuration
+└── README.md              # Frontend documentation
+```
+
+### 4.2 Real-time Chart Components (Week 12-13)
+
+#### OHLCV Chart Implementation
+```typescript
+// REQ-232 to REQ-235: Real-time charting with enriched data
+interface ChartProps {
+  symbol: string;
+  timeframe: string;
+  showEnriched: boolean;
+  indicators: string[];
+}
+
+// Real-time candlestick chart with technical indicators
+const OHLCVChart: React.FC<ChartProps> = ({
+  symbol,
+  timeframe,
+  showEnriched,
+  indicators
+}) => {
+  const { candles, enrichedData } = useOHLCV(symbol, timeframe);
+  const { isConnected } = useWebSocket(`/ws/ohlcv/${symbol}`);
+  
+  return (
+    <div className="chart-container bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+      <ChartHeader symbol={symbol} timeframe={timeframe} />
+      <CandlestickChart 
+        data={candles}
+        enriched={showEnriched ? enrichedData : undefined}
+        indicators={indicators}
+        realTime={isConnected}
+      />
+      <TechnicalIndicators 
+        visible={showEnriched}
+        data={enrichedData}
+        indicators={indicators}
+      />
+    </div>
+  );
+};
+```
+
+#### Chart Features
+- **REQ-232**: Real-time candlestick charts with live updates
+- **REQ-233**: Technical indicator overlays (SMA, EMA, Bollinger Bands)
+- **REQ-234**: Volume analysis and visualization
+- **REQ-235**: Interactive chart controls (zoom, pan, timeframe selection)
+
+### 4.3 CLI Integration Interface (Week 13)
+
+#### Web-based CLI Operations
+```typescript
+// REQ-236 to REQ-240: Web interface for CLI functionality
+interface CLICommand {
+  command: string;
+  args: string[];
+  description: string;
+}
+
+const CLIInterface: React.FC = () => {
+  const [commands, setCommands] = useState<CLICommand[]>([]);
+  const [output, setOutput] = useState<string>('');
+  const { executeCommand } = useAPI();
+
+  // CLI command categories
+  const commandCategories = {
+    data: [
+      { cmd: 'fetch', desc: 'Fetch historical OHLCV data' },
+      { cmd: 'symbols', desc: 'Manage tracked symbols' }
+    ],
+    mock: [
+      { cmd: 'mock enable', desc: 'Enable mock data mode' },
+      { cmd: 'mock speed', desc: 'Set mock data generation speed' },
+      { cmd: 'mock test', desc: 'Test mock data generation' }
+    ],
+    server: [
+      { cmd: 'health', desc: 'Check server health status' },
+      { cmd: 'metrics', desc: 'View performance metrics' }
+    ]
+  };
+
+  return (
+    <div className="cli-interface">
+      <CommandPalette commands={commandCategories} />
+      <TerminalOutput output={output} />
+      <CommandInput onExecute={executeCommand} />
+    </div>
+  );
+};
+```
+
+### 4.4 Server Monitoring Dashboard (Week 14)
+
+#### Real-time Monitoring Interface
+```typescript
+// REQ-241 to REQ-245: Server monitoring and health visualization
+const MonitoringDashboard: React.FC = () => {
+  const { healthStatus, metrics } = useServerMonitoring();
+  const { wsConnections, throughput } = useRealTimeMetrics();
+
+  return (
+    <div className="monitoring-dashboard grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <HealthStatusCard status={healthStatus} />
+      <ThroughputChart data={throughput} />
+      <ConnectionMetrics connections={wsConnections} />
+      <PerformanceMetrics metrics={metrics} />
+      <ErrorLogViewer />
+      <ResourceUsageChart />
+    </div>
+  );
+};
+```
+
+**Monitoring Features:**
+- **REQ-241**: Real-time server health status
+- **REQ-242**: WebSocket connection monitoring
+- **REQ-243**: API performance metrics visualization
+- **REQ-244**: Error log viewer with filtering
+- **REQ-245**: Resource usage graphs (CPU, memory, throughput)
+
+### 4.5 Responsive Design & Styling (Week 14)
+
+#### Tailwind CSS + Less Integration
+```less
+// REQ-246 to REQ-250: Modern UI/UX with responsive design
+// Component-specific Less styles with Tailwind integration
+
+.chart-container {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-lg;
+  
+  .chart-header {
+    @apply flex justify-between items-center mb-4 p-4 border-b border-gray-200 dark:border-gray-700;
+    
+    .symbol-title {
+      @apply text-xl font-semibold text-gray-900 dark:text-white;
+    }
+    
+    .timeframe-selector {
+      @apply flex space-x-2;
+      
+      button {
+        @apply px-3 py-1 rounded-md text-sm font-medium transition-colors;
+        @apply bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600;
+        
+        &.active {
+          @apply bg-blue-500 text-white hover:bg-blue-600;
+        }
+      }
+    }
+  }
+  
+  .chart-canvas {
+    @apply w-full h-96 relative;
+    
+    .loading-overlay {
+      @apply absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 bg-opacity-75;
+    }
+  }
+}
+
+.cli-interface {
+  @apply bg-gray-900 text-green-400 rounded-lg p-4 font-mono;
+  
+  .command-palette {
+    @apply mb-4 grid grid-cols-1 md:grid-cols-3 gap-4;
+    
+    .command-category {
+      @apply bg-gray-800 rounded p-3;
+      
+      h3 {
+        @apply text-white font-semibold mb-2;
+      }
+      
+      .command-button {
+        @apply block w-full text-left px-2 py-1 rounded text-sm;
+        @apply hover:bg-gray-700 transition-colors;
+      }
+    }
+  }
+  
+  .terminal-output {
+    @apply bg-black rounded p-3 mb-4 h-64 overflow-y-auto;
+    @apply border border-gray-700;
+  }
+  
+  .command-input {
+    @apply flex items-center space-x-2;
+    
+    input {
+      @apply flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2;
+      @apply text-green-400 placeholder-gray-500;
+    }
+  }
+}
+
+// Responsive chart layouts
+@media (max-width: 768px) {
+  .chart-container {
+    .chart-header {
+      @apply flex-col space-y-2;
+    }
+    
+    .timeframe-selector {
+      @apply justify-center;
+    }
+  }
+}
+```
+
+#### Design System Features
+- **REQ-246**: Dark/light theme support with Tailwind CSS
+- **REQ-247**: Mobile-responsive design for all screen sizes
+- **REQ-248**: Consistent component library with Less styling
+- **REQ-249**: Accessibility compliance (WCAG 2.1)
+- **REQ-250**: Fast loading with code splitting and lazy loading
+
+---
+
+## Phase 5: RAG Integration Implementation
+
+### 5.1 Vector Preparation & Context Generation (Week 15) - On-Demand Processing
 
 #### RAG Data Pipeline (On-Demand Export)
 ```go
@@ -340,7 +624,7 @@ internal/rag/
 - **REQ-224**: Searchable metadata filtering during export
 - **REQ-225**: Batch export for model training
 
-### 4.2 Human-Readable Descriptions (Week 13)
+### 5.2 Human-Readable Descriptions (Week 16)
 
 #### Market Narrative Generation
 ```go
@@ -404,7 +688,7 @@ Context: Breaking resistance at $150, high volume confirmation
 Confidence: 85% based on technical indicators alignment
 ```
 
-### 4.3 Vector Database Integration (Week 14-15) - Export Pipeline
+### 5.3 Vector Database Integration (Week 17-18) - Export Pipeline
 
 #### On-Demand Export Pipeline
 ```go
@@ -432,9 +716,9 @@ internal/vectordb/
 
 ---
 
-## Phase 5: Production Hardening Implementation
+## Phase 6: Production Hardening Implementation
 
-### 5.1 Monitoring & Health Checks (Week 16)
+### 6.1 Monitoring & Health Checks (Week 19)
 
 #### Observability Stack
 ```go
@@ -453,7 +737,7 @@ internal/monitoring/
 - **REQ-084**: Resource usage monitoring
 - **REQ-085**: Critical failure alerting
 
-### 5.2 Error Handling & Recovery (Week 16-17)
+### 6.2 Error Handling & Recovery (Week 19-20)
 
 #### Resilience Patterns
 ```go
@@ -471,7 +755,7 @@ internal/resilience/
 - **REQ-096**: Panic recovery without crashes
 - **REQ-097**: Automatic reconnection strategies
 
-### 5.3 Security Implementation (Week 17)
+### 6.3 Security Implementation (Week 20)
 
 #### Security Measures
 ```go
@@ -490,7 +774,7 @@ internal/security/
 - **REQ-044**: Environment-based secret management
 - **REQ-045**: HTTPS enforcement
 
-### 5.4 Deployment & Operations (Week 18)
+### 6.4 Deployment & Operations (Week 21)
 
 #### Production Readiness
 ```go
@@ -537,13 +821,21 @@ docker/
 - [ ] Support 100+ symbols with on-demand enrichment
 
 ### Phase 4 Completion Criteria
+- [ ] Modern React application with TypeScript operational
+- [ ] Real-time OHLCV charts with WebSocket streaming
+- [ ] Web-based CLI interface for all backend operations
+- [ ] Server monitoring dashboard with live metrics
+- [ ] Responsive design working on mobile and desktop
+- [ ] Dark/light theme support implemented
+
+### Phase 5 Completion Criteria
 - [ ] Vector export pipeline operational (on-demand processing)
 - [ ] Human-readable market descriptions generated
 - [ ] Context text generation operational
 - [ ] Batch export functionality for ML training
 - [ ] On-demand enrichment integration complete
 
-### Phase 5 Completion Criteria
+### Phase 6 Completion Criteria
 - [ ] Health checks and monitoring operational
 - [ ] Graceful error handling and recovery
 - [ ] Security measures implemented
@@ -615,7 +907,23 @@ github.com/lib/pq v1.10.9              // PostgreSQL
 github.com/gorilla/websocket           // WebSocket support
 ```
 
-### Development Tools
+### Frontend Dependencies
+```json
+// REQ-231 to REQ-250: Modern frontend tech stack
+{
+  "react": "^18.0.0",
+  "typescript": "^5.0.0",
+  "tailwindcss": "^3.0.0",
+  "less": "^4.0.0",
+  "vite": "^4.0.0",
+  "recharts": "^2.8.0",
+  "socket.io-client": "^4.7.0",
+  "zustand": "^4.4.0",
+  "react-router-dom": "^6.15.0",
+  "@types/react": "^18.0.0",
+  "@types/node": "^20.0.0"
+}
+```
 ```bash
 # Testing and quality
 go test -v -race -coverprofile=coverage.out ./...

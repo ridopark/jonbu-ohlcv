@@ -270,3 +270,33 @@
 - Provide <100ms latency for RAG system queries
 - Generate contextually accurate market summaries
 - Achieve >80% correlation between signals and market moves
+
+### 6. Web Frontend Requirements (Phase 4)
+
+#### Technology Stack
+- **REQ-231**: Frontend MUST use React 18+ with TypeScript 5+ for type safety
+- **REQ-232**: Frontend MUST use Tailwind CSS 3+ for styling with Less preprocessor support
+- **REQ-233**: Frontend MUST use Vite for fast development and optimized builds
+- **REQ-234**: Frontend MUST implement responsive design for mobile and desktop
+- **REQ-235**: Frontend MUST support dark/light theme switching
+
+#### Real-time Charts
+- **REQ-236**: Frontend MUST display real-time OHLCV candlestick charts
+- **REQ-237**: Frontend MUST support multiple timeframes (1m, 5m, 15m, 1h, 1d)
+- **REQ-238**: Frontend MUST display technical indicators (SMA, EMA, RSI, MACD)
+- **REQ-239**: Frontend MUST show enriched candle data with overlays
+- **REQ-240**: Frontend MUST implement interactive chart controls (zoom, pan, crosshair)
+
+#### CLI Integration
+- **REQ-241**: Frontend MUST provide web interface for all CLI commands
+- **REQ-242**: Frontend MUST display command execution results in terminal-style output
+- **REQ-243**: Frontend MUST support command history and auto-completion
+- **REQ-244**: Frontend MUST validate command parameters before execution
+- **REQ-245**: Frontend MUST show command descriptions and help text
+
+#### Server Monitoring
+- **REQ-246**: Frontend MUST display real-time server health status
+- **REQ-247**: Frontend MUST show WebSocket connection metrics
+- **REQ-248**: Frontend MUST visualize API performance metrics
+- **REQ-249**: Frontend MUST display error logs with filtering capabilities
+- **REQ-250**: Frontend MUST show resource usage graphs (CPU, memory, throughput)

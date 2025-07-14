@@ -88,7 +88,7 @@ func NewMockStreamClient(apiKey, secretKey, baseURL string, logger zerolog.Logge
 		ctx:             ctx,
 		cancel:          cancel,
 		candleInterval:  candleInterval,
-		priceVariance:   0.02,            // 2% price variance
+		priceVariance:   0.02, // 2% price variance
 		speedMultiplier: speedMultiplier,
 		logger: logger.With().
 			Str("component", "mock_alpaca_stream").

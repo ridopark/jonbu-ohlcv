@@ -213,6 +213,11 @@ type DataFetcher interface {
 │       ├── handlers/     # HTTP handlers
 │       ├── middleware/   # HTTP middleware
 │       └── types/        # API request/response types
+├── web/                   # Frontend React application (Phase 4)
+│   ├── src/              # React TypeScript source code
+│   ├── public/           # Static assets
+│   ├── package.json      # Frontend dependencies
+│   └── vite.config.ts    # Vite build configuration
 ├── migrations/            # Database schema migrations
 ├── config/               # Configuration files (.env.example)
 ├── docker/               # Docker configurations
@@ -235,6 +240,265 @@ internal/
 ```
 
 *Note: Some of these directories are already reflected in the main structure above as the project evolves toward full streaming capabilities.*
+
+---
+
+## Web Frontend Architecture (Phase 4)
+
+### Modern React + TypeScript Stack
+
+The web frontend provides a comprehensive dashboard for OHLCV data visualization, CLI operations, and server monitoring with real-time capabilities.
+
+#### Technology Stack
+- **Framework**: React 18+ with TypeScript 5+ for type safety and modern React features
+- **Styling**: Tailwind CSS 3+ with Less preprocessor for custom component styling
+- **Build Tool**: Vite for fast development server and optimized production builds
+- **Charts**: Recharts/Chart.js for real-time OHLCV candlestick charts and technical indicators
+- **State Management**: Zustand for lightweight, TypeScript-friendly state management
+- **WebSocket**: Socket.io client for real-time data streaming from Go backend
+- **Routing**: React Router v6 for single-page application navigation
+
+#### Project Structure
+```
+web/                       # Frontend application root
+├── src/
+│   ├── components/        # Reusable UI components
+│   │   ├── charts/       # OHLCV chart components
+│   │   │   ├── CandlestickChart.tsx
+│   │   │   ├── TechnicalIndicators.tsx
+│   │   │   └── VolumeChart.tsx
+│   │   ├── forms/        # Form components for CLI operations
+│   │   │   ├── SymbolForm.tsx
+│   │   │   ├── FetchForm.tsx
+│   │   │   └── MockControls.tsx
+│   │   ├── layout/       # Layout and navigation
+│   │   │   ├── Header.tsx
+│   │   │   ├── Sidebar.tsx
+│   │   │   └── Layout.tsx
+│   │   └── ui/           # Basic UI components
+│   │       ├── Button.tsx
+│   │       ├── Input.tsx
+│   │       └── Modal.tsx
+│   ├── pages/            # Route-based page components
+│   │   ├── Dashboard.tsx  # Main dashboard with charts
+│   │   ├── Symbols.tsx    # Symbol management interface
+│   │   ├── History.tsx    # Historical data viewer
+│   │   ├── CLI.tsx        # Web-based CLI interface
+│   │   ├── Monitoring.tsx # Server monitoring and health
+│   │   └── Settings.tsx   # Configuration management
+│   ├── hooks/            # Custom React hooks
+│   │   ├── useWebSocket.ts # WebSocket connection management
+│   │   ├── useOHLCV.ts    # OHLCV data fetching and streaming
+│   │   ├── useAPI.ts      # REST API integration
+│   │   └── useTheme.ts    # Dark/light theme management
+│   ├── stores/           # Zustand state management
+│   │   ├── chartStore.ts  # Chart data, settings, and indicators
+│   │   ├── symbolStore.ts # Symbol tracking and management
+│   │   ├── cliStore.ts    # CLI command history and state
+│   │   └── configStore.ts # Application configuration
+│   ├── services/         # API and WebSocket services
+│   │   ├── api.ts         # REST API client with TypeScript types
+│   │   ├── websocket.ts   # WebSocket client for real-time data
+│   │   └── types.ts       # TypeScript type definitions for API
+│   ├── styles/           # Styling and themes
+│   │   ├── globals.less   # Global Less styles and variables
+│   │   ├── components.less # Component-specific Less styles
+│   │   ├── themes.less    # Dark/light theme definitions
+│   │   └── tailwind.css   # Tailwind CSS imports and customizations
+│   └── utils/            # Utility functions
+│       ├── formatters.ts  # Data formatting utilities
+│       ├── validators.ts  # Input validation helpers
+│       └── constants.ts   # Application constants
+├── public/               # Static assets
+├── package.json         # Dependencies and scripts
+├── tsconfig.json        # TypeScript configuration
+├── tailwind.config.js   # Tailwind CSS configuration
+├── vite.config.ts       # Vite build configuration
+└── README.md            # Frontend documentation
+```
+
+### Frontend Features
+
+#### Real-time Chart Dashboard
+- **Candlestick Charts**: Live OHLCV data visualization with multiple timeframes
+- **Technical Indicators**: SMA, EMA, RSI, MACD overlays with enriched candle data
+- **Interactive Controls**: Zoom, pan, crosshair, timeframe selection
+- **Volume Analysis**: Volume bars with market hours highlighting
+- **Symbol Switching**: Quick symbol selection with favorites
+
+#### Web-based CLI Interface
+- **Command Execution**: All CLI commands available through web interface
+- **Terminal Output**: Styled terminal display with command history
+- **Auto-completion**: Smart command and parameter suggestions
+- **Parameter Validation**: Real-time validation with helpful error messages
+- **Command Palette**: Quick access to frequently used commands
+
+#### Server Monitoring Dashboard
+- **Health Status**: Real-time server component health indicators
+- **Performance Metrics**: API response times, throughput, error rates
+- **WebSocket Monitoring**: Active connections, subscription counts
+- **Resource Usage**: CPU, memory, and database connection monitoring
+- **Error Logs**: Filterable error log viewer with correlation IDs
+
+#### Responsive Design System
+- **Mobile-first**: Optimized for mobile, tablet, and desktop
+- **Dark/Light Themes**: User-configurable theme with system preference detection
+- **Component Library**: Consistent, reusable components with Tailwind + Less
+- **Accessibility**: WCAG 2.1 compliance with keyboard navigation
+- **Performance**: Code splitting, lazy loading, and optimized bundles
+
+### Frontend Development Guidelines
+
+#### React + TypeScript Best Practices
+```typescript
+// Component with proper TypeScript typing
+interface ChartProps {
+  symbol: string;
+  timeframe: '1m' | '5m' | '15m' | '1h' | '1d';
+  showIndicators: boolean;
+  onTimeframeChange: (timeframe: string) => void;
+}
+
+const OHLCVChart: React.FC<ChartProps> = ({
+  symbol,
+  timeframe,
+  showIndicators,
+  onTimeframeChange
+}) => {
+  // Use custom hooks for data fetching
+  const { candles, loading, error } = useOHLCV(symbol, timeframe);
+  const { enrichedData } = useEnrichedCandles(symbol, timeframe);
+  
+  // Handle loading and error states
+  if (loading) return <ChartSkeleton />;
+  if (error) return <ErrorBoundary error={error} />;
+  
+  return (
+    <div className="chart-container">
+      <ChartHeader 
+        symbol={symbol}
+        timeframe={timeframe}
+        onTimeframeChange={onTimeframeChange}
+      />
+      <CandlestickChart data={candles} />
+      {showIndicators && (
+        <TechnicalIndicators data={enrichedData} />
+      )}
+    </div>
+  );
+};
+```
+
+#### State Management with Zustand
+```typescript
+// Type-safe store with Zustand
+interface ChartStore {
+  symbol: string;
+  timeframe: string;
+  indicators: string[];
+  theme: 'light' | 'dark';
+  setSymbol: (symbol: string) => void;
+  setTimeframe: (timeframe: string) => void;
+  toggleIndicator: (indicator: string) => void;
+  setTheme: (theme: 'light' | 'dark') => void;
+}
+
+const useChartStore = create<ChartStore>((set) => ({
+  symbol: 'AAPL',
+  timeframe: '1m',
+  indicators: ['SMA20', 'EMA50'],
+  theme: 'dark',
+  setSymbol: (symbol) => set({ symbol }),
+  setTimeframe: (timeframe) => set({ timeframe }),
+  toggleIndicator: (indicator) => set((state) => ({
+    indicators: state.indicators.includes(indicator)
+      ? state.indicators.filter(i => i !== indicator)
+      : [...state.indicators, indicator]
+  })),
+  setTheme: (theme) => set({ theme }),
+}));
+```
+
+#### Tailwind + Less Integration
+```less
+// Component-specific styles with Tailwind integration
+.chart-container {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4;
+  
+  .chart-header {
+    @apply flex justify-between items-center mb-4;
+    
+    .symbol-title {
+      @apply text-xl font-semibold text-gray-900 dark:text-white;
+      
+      // Custom Less styling
+      &:hover {
+        @apply text-blue-600 dark:text-blue-400;
+        transition: color 0.2s ease;
+      }
+    }
+    
+    .timeframe-buttons {
+      @apply flex space-x-2;
+      
+      button {
+        @apply px-3 py-1 rounded-md text-sm font-medium;
+        @apply bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600;
+        
+        &.active {
+          @apply bg-blue-500 text-white hover:bg-blue-600;
+        }
+      }
+    }
+  }
+}
+
+// Responsive design with Less mixins
+@media (max-width: 768px) {
+  .chart-container {
+    @apply p-2;
+    
+    .chart-header {
+      @apply flex-col space-y-2;
+    }
+  }
+}
+```
+
+#### WebSocket Integration
+```typescript
+// Real-time data streaming with proper error handling
+const useWebSocket = (endpoint: string) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const socketInstance = io(`ws://localhost:8080${endpoint}`);
+    
+    socketInstance.on('connect', () => {
+      setIsConnected(true);
+      setError(null);
+    });
+    
+    socketInstance.on('disconnect', () => {
+      setIsConnected(false);
+    });
+    
+    socketInstance.on('error', (err) => {
+      setError(err.message);
+    });
+    
+    setSocket(socketInstance);
+    
+    return () => {
+      socketInstance.disconnect();
+    };
+  }, [endpoint]);
+
+  return { socket, isConnected, error };
+};
+```
 
 ---
 
