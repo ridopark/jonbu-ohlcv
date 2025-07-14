@@ -1,0 +1,185 @@
+/* Component-specific Less styles */
+
+.chart-container {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-lg;
+  
+  .chart-header {
+    @apply flex justify-between items-center mb-4 p-4 border-b border-gray-200 dark:border-gray-700;
+    
+    .symbol-title {
+      @apply text-xl font-semibold text-gray-900 dark:text-white;
+      
+      &:hover {
+        @apply text-blue-600 dark:text-blue-400;
+        transition: color 0.2s ease;
+      }
+    }
+    
+    .timeframe-selector {
+      @apply flex space-x-2;
+      
+      button {
+        @apply px-3 py-1 rounded-md text-sm font-medium transition-colors;
+        @apply bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600;
+        
+        &.active {
+          @apply bg-blue-500 text-white hover:bg-blue-600;
+        }
+      }
+    }
+  }
+  
+  .chart-canvas {
+    @apply w-full h-96 relative;
+    
+    .loading-overlay {
+      @apply absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 bg-opacity-75;
+    }
+  }
+}
+
+.cli-interface {
+  @apply bg-gray-900 text-green-400 rounded-lg p-4 font-mono;
+  
+  .command-palette {
+    @apply mb-4 grid grid-cols-1 md:grid-cols-3 gap-4;
+    
+    .command-category {
+      @apply bg-gray-800 rounded p-3;
+      
+      h3 {
+        @apply text-white font-semibold mb-2;
+      }
+      
+      .command-button {
+        @apply block w-full text-left px-2 py-1 rounded text-sm;
+        @apply hover:bg-gray-700 transition-colors cursor-pointer;
+      }
+    }
+  }
+  
+  .terminal-output {
+    @apply bg-black rounded p-3 mb-4 h-64 overflow-y-auto;
+    @apply border border-gray-700;
+    
+    .output-line {
+      @apply mb-1;
+      
+      &.error {
+        @apply text-red-400;
+      }
+      
+      &.success {
+        @apply text-green-400;
+      }
+      
+      &.warning {
+        @apply text-yellow-400;
+      }
+    }
+  }
+  
+  .command-input {
+    @apply flex items-center space-x-2;
+    
+    .prompt {
+      @apply text-green-400 font-bold;
+    }
+    
+    input {
+      @apply flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2;
+      @apply text-green-400 placeholder-gray-500;
+      @apply focus:outline-none focus:ring-2 focus:ring-blue-500;
+    }
+    
+    button {
+      @apply px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded;
+      @apply transition-colors;
+    }
+  }
+}
+
+.monitoring-dashboard {
+  .metric-card {
+    @apply bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg;
+    
+    .metric-header {
+      @apply flex items-center justify-between mb-4;
+      
+      .metric-title {
+        @apply text-lg font-semibold text-gray-900 dark:text-white;
+      }
+      
+      .metric-icon {
+        @apply w-8 h-8 text-blue-500;
+      }
+    }
+    
+    .metric-value {
+      @apply text-3xl font-bold text-gray-900 dark:text-white mb-2;
+      
+      &.success {
+        @apply text-green-500;
+      }
+      
+      &.warning {
+        @apply text-yellow-500;
+      }
+      
+      &.error {
+        @apply text-red-500;
+      }
+    }
+    
+    .metric-change {
+      @apply text-sm;
+      
+      &.positive {
+        @apply text-green-500;
+      }
+      
+      &.negative {
+        @apply text-red-500;
+      }
+    }
+  }
+  
+  .status-indicator {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    
+    &.online {
+      @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+    }
+    
+    &.offline {
+      @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+    }
+    
+    &.warning {
+      @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+    }
+  }
+}
+
+/* Responsive design adjustments */
+@media (max-width: 768px) {
+  .chart-container {
+    .chart-header {
+      @apply flex-col space-y-2;
+      
+      .timeframe-selector {
+        @apply justify-center;
+      }
+    }
+  }
+  
+  .cli-interface {
+    .command-palette {
+      @apply grid-cols-1;
+    }
+  }
+  
+  .monitoring-dashboard {
+    @apply grid-cols-1;
+  }
+}
