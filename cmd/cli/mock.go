@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -54,10 +55,37 @@ var mockTestCmd = &cobra.Command{
 	},
 }
 
+var mockSpeedCmd = &cobra.Command{
+	Use:   "speed [multiplier]",
+	Short: "Set mock data generation speed",
+	Long:  "Set the speed multiplier for mock data generation (e.g., 10.0 for 10x faster)",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := setMockSpeed(args[0]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error setting mock speed: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
+
+var mockStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show mock service status",
+	Long:  "Display current mock service configuration and speed settings",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := showMockStatus(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting mock status: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
+
 func init() {
 	mockCmd.AddCommand(mockEnableCmd)
 	mockCmd.AddCommand(mockDisableCmd)
 	mockCmd.AddCommand(mockTestCmd)
+	mockCmd.AddCommand(mockSpeedCmd)
+	mockCmd.AddCommand(mockStatusCmd)
 	rootCmd.AddCommand(mockCmd)
 }
 
@@ -126,6 +154,69 @@ func testMockData() error {
 
 	fmt.Println("🔍 Monitor the server logs to see mock data events being generated")
 	fmt.Println("📊 Use WebSocket client to see real-time mock data: ws://localhost:8080/ws")
+
+	return nil
+}
+
+func setMockSpeed(speedStr string) error {
+	speed, err := strconv.ParseFloat(speedStr, 64)
+	if err != nil {
+		return fmt.Errorf("invalid speed multiplier: %w", err)
+	}
+
+	if speed <= 0 {
+		return fmt.Errorf("speed multiplier must be positive")
+	}
+
+	serverURL := "http://localhost:8080"
+
+	requestBody := map[string]interface{}{
+		"speed_multiplier": speed,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Make request to set speed
+	resp, err := http.Post(serverURL+"/api/v1/mock/speed", "application/json",
+		bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to set mock speed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to set mock speed, status: %s", resp.Status)
+	}
+
+	fmt.Printf("✅ Mock speed set to %.1fx\n", speed)
+	return nil
+}
+
+func showMockStatus() error {
+	serverURL := "http://localhost:8080"
+
+	resp, err := http.Get(serverURL + "/api/v1/mock/status")
+	if err != nil {
+		return fmt.Errorf("failed to get mock status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to get mock status, status: %s", resp.Status)
+	}
+
+	var status map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return fmt.Errorf("failed to decode status: %w", err)
+	}
+
+	fmt.Println("📊 Mock Service Status:")
+	for key, value := range status {
+		fmt.Printf("  %s: %v\n", key, value)
+	}
 
 	return nil
 }
