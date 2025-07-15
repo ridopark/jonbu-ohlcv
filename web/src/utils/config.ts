@@ -13,7 +13,7 @@ export const config = {
     },
   },
   websocket: {
-    url: `${WS_BASE_URL}/ws`,
+    url: `${WS_BASE_URL}/ws/ohlcv`,
     reconnectInterval: 5000,
     maxReconnectAttempts: 10,
   },

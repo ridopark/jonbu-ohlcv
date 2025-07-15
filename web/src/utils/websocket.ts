@@ -1,5 +1,4 @@
 import { config } from './config';
-import type { WebSocketMessage } from '../types';
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
@@ -32,10 +31,10 @@ export class WebSocketClient {
 
       this.ws.onmessage = (event) => {
         try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          this.emit(message.type, message.data);
+          // Handle potentially concatenated JSON messages
+          this.parseWebSocketMessages(event.data);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error('Failed to parse WebSocket message:', error, 'Raw data:', event.data);
         }
       };
 
@@ -111,6 +110,149 @@ export class WebSocketClient {
       this.ws.send(JSON.stringify(message));
     } else {
       console.warn('WebSocket is not connected. Message not sent:', message);
+    }
+  }
+
+  // WebSocket subscription methods
+  public subscribeToSymbol(symbol: string, timeframe: string): void {
+    const subscription = {
+      type: 'subscription',
+      symbol: symbol,
+      timeframe: timeframe,
+      action: 'subscribe'
+    };
+    
+    console.log(`🔔 Subscribing to ${symbol} ${timeframe}`, {
+      subscription,
+      timestamp: new Date().toISOString(),
+      connectionState: this.readyState === WebSocket.OPEN ? 'OPEN' : 'NOT_OPEN'
+    });
+    this.send(subscription);
+  }
+
+  public unsubscribeFromSymbol(symbol: string, timeframe: string): void {
+    const subscription = {
+      type: 'subscription', 
+      symbol: symbol,
+      timeframe: timeframe,
+      action: 'unsubscribe'
+    };
+    
+    console.log(`🔕 Unsubscribing from ${symbol} ${timeframe}`, {
+      subscription,
+      timestamp: new Date().toISOString(),
+      connectionState: this.readyState === WebSocket.OPEN ? 'OPEN' : 'NOT_OPEN'
+    });
+    this.send(subscription);
+  }
+
+  // Parse potentially concatenated JSON messages from WebSocket
+  private parseWebSocketMessages(rawData: string): void {
+    // Handle single JSON object (most common case)
+    if (rawData.trim().startsWith('{') && rawData.trim().endsWith('}')) {
+      try {
+        const message = JSON.parse(rawData);
+        this.handleWebSocketMessage(message);
+        return;
+      } catch (error) {
+        // If single parse fails, try splitting approach
+        console.warn('Single JSON parse failed, attempting message splitting...');
+      }
+    }
+
+    // Handle concatenated JSON messages by splitting on "}{"
+    const messages: string[] = [];
+    let currentMessage = '';
+    let braceCount = 0;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = 0; i < rawData.length; i++) {
+      const char = rawData[i];
+      currentMessage += char;
+
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          
+          // Complete JSON object found
+          if (braceCount === 0) {
+            messages.push(currentMessage.trim());
+            currentMessage = '';
+          }
+        }
+      }
+    }
+
+    // Add any remaining message
+    if (currentMessage.trim()) {
+      messages.push(currentMessage.trim());
+    }
+
+    // Parse and handle each message
+    console.log(`📦 Split WebSocket data into ${messages.length} messages`);
+    
+    messages.forEach((messageStr, index) => {
+      try {
+        if (messageStr) {
+          const message = JSON.parse(messageStr);
+          this.handleWebSocketMessage(message);
+        }
+      } catch (error) {
+        console.error(`Failed to parse message ${index + 1}:`, error, 'Message:', messageStr);
+      }
+    });
+  }
+
+  // Handle individual parsed WebSocket message
+  private handleWebSocketMessage(message: any): void {
+    // Log raw message received
+    console.log('📨 WebSocket message received:', {
+      type: message.type,
+      timestamp: new Date().toISOString(),
+      data: message
+    });
+    
+    // Handle different message types from the backend
+    if (message.type === 'candle') {
+      console.log('📈 Processing candle data:', {
+        symbol: message.symbol || message.data?.symbol,
+        timeframe: message.timeframe || message.data?.interval,
+        timestamp: message.data?.timestamp,
+        close: message.data?.close,
+        volume: message.data?.volume
+      });
+      this.emit('candle', message);
+    } else if (message.type === 'error') {
+      console.error('❌ WebSocket error received:', message);
+      this.emit('error', message);
+    } else if (message.type === 'status') {
+      console.log('ℹ️ WebSocket status update:', message);
+      this.emit('status', message);
+    } else if (message.type === 'connected') {
+      console.log('🔗 WebSocket connection confirmed:', message);
+      this.emit('connected', message);
+    } else {
+      // Fallback for any other message format
+      console.log('🔄 WebSocket unknown message type:', message.type, message);
+      this.emit(message.type || 'message', message);
     }
   }
 

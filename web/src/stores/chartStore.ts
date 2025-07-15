@@ -115,6 +115,19 @@ export const useChartStore = create<ChartStore>()(
       },
       
       addCandle: (candle: OHLCVCandle) => {
+        // Validate candle data before adding to store
+        if (!candle || 
+            typeof candle.open !== 'number' || !isFinite(candle.open) ||
+            typeof candle.high !== 'number' || !isFinite(candle.high) ||
+            typeof candle.low !== 'number' || !isFinite(candle.low) ||
+            typeof candle.close !== 'number' || !isFinite(candle.close) ||
+            typeof candle.volume !== 'number' || !isFinite(candle.volume) ||
+            candle.open <= 0 || candle.high <= 0 || candle.low <= 0 || candle.close <= 0 ||
+            candle.volume < 0) {
+          console.warn('🚫 Invalid candle data rejected:', candle);
+          return;
+        }
+        
         const { candles } = get();
         const updatedCandles = [...candles];
         

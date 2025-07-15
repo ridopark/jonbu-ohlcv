@@ -10,7 +10,18 @@ const CandlestickChart: React.FC = () => {
   const chartData = React.useMemo(() => {
     if (candles.length === 0) return [];
     
-    return candles.slice(-100).map((candle, index) => ({
+    // Filter out invalid candles and ensure numeric values
+    const validCandles = candles.filter(candle => 
+      candle &&
+      typeof candle.open === 'number' && !isNaN(candle.open) &&
+      typeof candle.high === 'number' && !isNaN(candle.high) &&
+      typeof candle.low === 'number' && !isNaN(candle.low) &&
+      typeof candle.close === 'number' && !isNaN(candle.close) &&
+      typeof candle.volume === 'number' && !isNaN(candle.volume) &&
+      candle.open > 0 && candle.high > 0 && candle.low > 0 && candle.close > 0
+    );
+    
+    return validCandles.slice(-100).map((candle, index) => ({
       ...candle,
       index,
       enriched: enrichedCandles.find(e => e.timestamp === candle.timestamp),
@@ -20,10 +31,22 @@ const CandlestickChart: React.FC = () => {
   const priceRange = React.useMemo(() => {
     if (chartData.length === 0) return { min: 0, max: 100 };
     
-    const allPrices = chartData.flatMap(d => [d.high, d.low]);
+    const allPrices = chartData.flatMap(d => [d.high, d.low]).filter(price => 
+      typeof price === 'number' && !isNaN(price) && price > 0
+    );
+    
+    if (allPrices.length === 0) return { min: 0, max: 100 };
+    
     const min = Math.min(...allPrices);
     const max = Math.max(...allPrices);
-    const padding = (max - min) * 0.1;
+    const range = max - min;
+    
+    // Prevent division by zero and ensure valid range
+    if (range === 0 || !isFinite(range)) {
+      return { min: min - 1, max: min + 1 };
+    }
+    
+    const padding = range * 0.1;
     
     return {
       min: Math.max(0, min - padding),
@@ -34,20 +57,26 @@ const CandlestickChart: React.FC = () => {
   const volumeRange = React.useMemo(() => {
     if (chartData.length === 0) return { min: 0, max: 1000 };
     
-    const volumes = chartData.map(d => d.volume);
+    const volumes = chartData.map(d => d.volume).filter(vol => 
+      typeof vol === 'number' && !isNaN(vol) && vol >= 0
+    );
+    
+    if (volumes.length === 0) return { min: 0, max: 1000 };
+    
     const max = Math.max(...volumes);
     
     return {
       min: 0,
-      max: max * 1.2,
+      max: Math.max(max * 1.2, 1), // Ensure minimum max value
     };
   }, [chartData]);
-  
-  const formatPrice = (price: number) => {
+   const formatPrice = (price: number) => {
+    if (!isFinite(price) || isNaN(price)) return '$0.00';
     return `$${price.toFixed(2)}`;
   };
-  
+
   const formatVolume = (volume: number) => {
+    if (!isFinite(volume) || isNaN(volume) || volume < 0) return '0';
     if (volume >= 1e6) return `${(volume / 1e6).toFixed(1)}M`;
     if (volume >= 1e3) return `${(volume / 1e3).toFixed(1)}K`;
     return volume.toString();
@@ -115,15 +144,23 @@ const CandlestickChart: React.FC = () => {
               const x = (index / (chartData.length - 1)) * 780 + 10;
               const isGreen = candle.close > candle.open;
               
-              // Scale prices to chart height
+              // Scale prices to chart height with NaN protection
               const scalePrice = (price: number) => {
-                return 220 - ((price - priceRange.min) / (priceRange.max - priceRange.min)) * 200;
+                if (!isFinite(price) || isNaN(price)) return 110; // Middle of chart
+                const range = priceRange.max - priceRange.min;
+                if (range === 0) return 110;
+                return 220 - ((price - priceRange.min) / range) * 200;
               };
               
               const highY = scalePrice(candle.high);
               const lowY = scalePrice(candle.low);
               const openY = scalePrice(candle.open);
               const closeY = scalePrice(candle.close);
+              
+              // Additional NaN checks
+              if (!isFinite(x) || !isFinite(highY) || !isFinite(lowY) || !isFinite(openY) || !isFinite(closeY)) {
+                return null;
+              }
               
               const bodyTop = Math.min(openY, closeY);
               const bodyHeight = Math.abs(openY - closeY);
@@ -152,19 +189,23 @@ const CandlestickChart: React.FC = () => {
                   />
                 </g>
               );
-            })}
+            }).filter(Boolean)}
             
             {/* Price labels */}
             <g className="text-xs fill-current text-muted-foreground">
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
                 const price = priceRange.min + (priceRange.max - priceRange.min) * ratio;
                 const y = 220 - ratio * 200;
+                
+                // Skip invalid price labels
+                if (!isFinite(price) || !isFinite(y)) return null;
+                
                 return (
                   <text key={ratio} x="5" y={y + 4} className="text-xs">
                     {formatPrice(price)}
                   </text>
                 );
-              })}
+              }).filter(Boolean)}
             </g>
           </svg>
           
@@ -180,6 +221,11 @@ const CandlestickChart: React.FC = () => {
               const height = (candle.volume / volumeRange.max) * 50;
               const isGreen = candle.close > candle.open;
               
+              // NaN protection for volume chart
+              if (!isFinite(x) || !isFinite(height) || height < 0) {
+                return null;
+              }
+              
               return (
                 <rect
                   key={`volume-${index}`}
@@ -191,7 +237,7 @@ const CandlestickChart: React.FC = () => {
                   opacity="0.6"
                 />
               );
-            })}
+            }).filter(Boolean)}
             
             {/* Volume labels */}
             <text x="5" y="15" className="text-xs fill-current text-muted-foreground">

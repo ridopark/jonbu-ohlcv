@@ -52,6 +52,7 @@ type PoolConfig struct {
 	WorkerBufferSize    int
 	HealthCheckInterval time.Duration
 	MetricsInterval     time.Duration
+	UseMockMode         bool // Enable data-driven aggregation for mock testing
 }
 
 // DefaultPoolConfig returns a default configuration
@@ -143,9 +144,10 @@ func (p *Pool) AddSymbol(symbol, timeframe string) error {
 
 	// Create new worker
 	workerConfig := WorkerConfig{
-		Symbol:     symbol,
-		Timeframe:  timeframe,
-		BufferSize: p.config.WorkerBufferSize,
+		Symbol:      symbol,
+		Timeframe:   timeframe,
+		BufferSize:  p.config.WorkerBufferSize,
+		UseMockMode: p.config.UseMockMode,
 	}
 
 	worker := NewSymbolWorker(workerConfig, p.logger)

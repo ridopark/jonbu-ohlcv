@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -26,7 +27,11 @@ type SymbolWorker struct {
 	// Aggregation state
 	currentCandle    *models.Candle
 	intervalDuration time.Duration
-	lastEmit         time.Time
+
+	// Mock mode data-driven aggregation
+	useMockMode         bool
+	dataCountInInterval int
+	targetDataCount     int
 
 	// Context and lifecycle
 	ctx    context.Context
@@ -42,10 +47,11 @@ type SymbolWorker struct {
 
 // WorkerConfig holds configuration for symbol workers
 type WorkerConfig struct {
-	Symbol     string
-	Timeframe  string
-	BufferSize int
-	LogLevel   string
+	Symbol      string
+	Timeframe   string
+	BufferSize  int
+	LogLevel    string
+	UseMockMode bool // Enable data-driven aggregation for mock testing
 }
 
 // NewSymbolWorker creates a new worker for a symbol-timeframe combination
@@ -53,19 +59,24 @@ func NewSymbolWorker(config WorkerConfig, logger zerolog.Logger) *SymbolWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	intervalDuration := parseTimeframeDuration(config.Timeframe)
+	targetDataCount := getTargetDataCount(config.Timeframe, config.UseMockMode)
 
 	return &SymbolWorker{
-		Symbol:           config.Symbol,
-		Timeframe:        config.Timeframe,
-		Input:            make(chan models.MarketEvent, config.BufferSize),
-		Output:           make(chan models.Candle, 100), // REQ-034: Buffered output
-		intervalDuration: intervalDuration,
-		ctx:              ctx,
-		cancel:           cancel,
+		Symbol:              config.Symbol,
+		Timeframe:           config.Timeframe,
+		Input:               make(chan models.MarketEvent, config.BufferSize),
+		Output:              make(chan models.Candle, 100), // REQ-034: Buffered output
+		intervalDuration:    intervalDuration,
+		useMockMode:         config.UseMockMode,
+		dataCountInInterval: 0,
+		targetDataCount:     targetDataCount,
+		ctx:                 ctx,
+		cancel:              cancel,
 		logger: logger.With().
 			Str("component", "symbol_worker").
 			Str("symbol", config.Symbol).
 			Str("timeframe", config.Timeframe).
+			Bool("mock_mode", config.UseMockMode).
 			Logger(),
 	}
 }
@@ -94,7 +105,14 @@ func (w *SymbolWorker) run() {
 	}()
 
 	// REQ-032: Sub-millisecond processing target
-	ticker := time.NewTicker(100 * time.Millisecond) // Check for interval completion
+	var ticker *time.Ticker
+	if w.useMockMode {
+		// In mock mode, check less frequently since we're data-driven
+		ticker = time.NewTicker(500 * time.Millisecond)
+	} else {
+		// In real mode, check for time-based interval completion
+		ticker = time.NewTicker(100 * time.Millisecond)
+	}
 	defer ticker.Stop()
 
 	for {
@@ -113,7 +131,9 @@ func (w *SymbolWorker) run() {
 			w.processEvent(event)
 
 		case <-ticker.C:
-			w.checkIntervalCompletion()
+			if !w.useMockMode {
+				w.checkIntervalCompletion()
+			}
 		}
 	}
 }
@@ -124,6 +144,11 @@ func (w *SymbolWorker) processEvent(event models.MarketEvent) {
 	defer w.mu.Unlock()
 
 	w.eventsProcessed++
+
+	// In mock mode, increment data count before interval check
+	if w.useMockMode {
+		w.dataCountInInterval++
+	}
 
 	// Check if this event belongs to a new interval
 	if w.shouldStartNewInterval(event.Timestamp) {
@@ -150,7 +175,13 @@ func (w *SymbolWorker) shouldStartNewInterval(timestamp time.Time) bool {
 		return true
 	}
 
-	// Calculate interval boundary
+	if w.useMockMode {
+		// In mock mode, start new interval when data count target is reached
+		// This ensures we create separate candles with different timestamps
+		return w.dataCountInInterval >= w.targetDataCount
+	}
+
+	// In real mode, use time-based boundaries
 	intervalStart := w.getIntervalStart(timestamp)
 	currentIntervalStart := w.getIntervalStart(w.currentCandle.Timestamp)
 
@@ -159,22 +190,53 @@ func (w *SymbolWorker) shouldStartNewInterval(timestamp time.Time) bool {
 
 // startNewCandle begins a new candle with the given event
 func (w *SymbolWorker) startNewCandle(event models.MarketEvent) {
-	intervalStart := w.getIntervalStart(event.Timestamp)
+	var intervalStart time.Time
 
-	w.currentCandle = &models.Candle{
-		Symbol:    w.Symbol,
-		Timestamp: intervalStart,
-		Open:      event.Price,
-		High:      event.Price,
-		Low:       event.Price,
-		Close:     event.Price,
-		Volume:    event.Volume,
-		Interval:  w.Timeframe,
+	if w.useMockMode {
+		// In mock mode, use the actual event timestamp to avoid database conflicts
+		// Since mock mode is data-driven, we don't need to align to interval boundaries
+		intervalStart = event.Timestamp
+	} else {
+		// In real mode, use calculated interval boundaries
+		intervalStart = w.getIntervalStart(event.Timestamp)
+	}
+
+	// Handle bar events with full OHLC data differently
+	if event.Type == "bar" && event.Open != 0 && event.High != 0 && event.Low != 0 && event.Close != 0 {
+		// Bar event with complete OHLC data - use it directly
+		w.currentCandle = &models.Candle{
+			Symbol:    w.Symbol,
+			Timestamp: intervalStart,
+			Open:      event.Open,
+			High:      event.High,
+			Low:       event.Low,
+			Close:     event.Close,
+			Volume:    event.Volume,
+			Interval:  w.Timeframe,
+		}
+	} else {
+		// Trade/quote event - build OHLC from price
+		w.currentCandle = &models.Candle{
+			Symbol:    w.Symbol,
+			Timestamp: intervalStart,
+			Open:      event.Price,
+			High:      event.Price,
+			Low:       event.Price,
+			Close:     event.Price,
+			Volume:    event.Volume,
+			Interval:  w.Timeframe,
+		}
+	}
+
+	// Reset data count for mock mode
+	if w.useMockMode {
+		w.dataCountInInterval = 1 // This event counts as the first
 	}
 
 	w.logger.Debug().
 		Time("interval_start", intervalStart).
-		Float64("open_price", event.Price).
+		Float64("open_price", w.currentCandle.Open).
+		Bool("mock_mode", w.useMockMode).
 		Msg("Started new candle")
 }
 
@@ -185,16 +247,24 @@ func (w *SymbolWorker) updateCandle(event models.MarketEvent) {
 		return
 	}
 
-	// Update OHLCV values
-	if event.Price > w.currentCandle.High {
-		w.currentCandle.High = event.Price
+	// Handle bar events with full OHLC data differently
+	if event.Type == "bar" && event.Open != 0 && event.High != 0 && event.Low != 0 && event.Close != 0 {
+		// Bar event with complete OHLC data - update with aggregated values
+		w.currentCandle.High = math.Max(w.currentCandle.High, event.High)
+		w.currentCandle.Low = math.Min(w.currentCandle.Low, event.Low)
+		w.currentCandle.Close = event.Close
+		w.currentCandle.Volume += event.Volume
+	} else {
+		// Trade/quote event - update OHLC values from price
+		if event.Price > w.currentCandle.High {
+			w.currentCandle.High = event.Price
+		}
+		if event.Price < w.currentCandle.Low {
+			w.currentCandle.Low = event.Price
+		}
+		w.currentCandle.Close = event.Price
+		w.currentCandle.Volume += event.Volume
 	}
-	if event.Price < w.currentCandle.Low {
-		w.currentCandle.Low = event.Price
-	}
-
-	w.currentCandle.Close = event.Price
-	w.currentCandle.Volume += event.Volume
 }
 
 // checkIntervalCompletion checks if the current interval should be completed
@@ -224,6 +294,11 @@ func (w *SymbolWorker) emitCandle() {
 	w.currentCandle = nil
 	w.candlesEmitted++
 
+	// Reset data count for next interval in mock mode
+	if w.useMockMode {
+		w.dataCountInInterval = 0
+	}
+
 	select {
 	case w.Output <- candle:
 		w.logger.Debug().
@@ -233,6 +308,7 @@ func (w *SymbolWorker) emitCandle() {
 			Float64("low", candle.Low).
 			Float64("close", candle.Close).
 			Int64("volume", candle.Volume).
+			Bool("mock_mode", w.useMockMode).
 			Msg("Emitted candle")
 	default:
 		// REQ-034: Don't block if output buffer is full
@@ -287,6 +363,30 @@ func parseTimeframeDuration(timeframe string) time.Duration {
 	}
 }
 
+// getTargetDataCount calculates how many data points are needed for an interval in mock mode
+func getTargetDataCount(timeframe string, useMockMode bool) int {
+	if !useMockMode {
+		return 0 // Not used in real mode
+	}
+
+	switch timeframe {
+	case "1min":
+		return 1 // 1 mock data point = 1 minute
+	case "5min":
+		return 5 // 5 mock data points = 5 minutes
+	case "15min":
+		return 15 // 15 mock data points = 15 minutes
+	case "30min":
+		return 30 // 30 mock data points = 30 minutes
+	case "1hour":
+		return 60 // 60 mock data points = 1 hour
+	case "1day":
+		return 1440 // 1440 mock data points = 1 day (24 * 60)
+	default:
+		return 1
+	}
+}
+
 // GetMetrics returns worker performance metrics
 func (w *SymbolWorker) GetMetrics() (eventsProcessed, candlesEmitted int64) {
 	w.mu.RLock()
@@ -305,6 +405,12 @@ func (w *SymbolWorker) GetStatus() map[string]interface{} {
 		"events_processed": w.eventsProcessed,
 		"candles_emitted":  w.candlesEmitted,
 		"active":           w.ctx.Err() == nil,
+		"mock_mode":        w.useMockMode,
+	}
+
+	if w.useMockMode {
+		status["data_count_in_interval"] = w.dataCountInInterval
+		status["target_data_count"] = w.targetDataCount
 	}
 
 	if w.currentCandle != nil {

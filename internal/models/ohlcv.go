@@ -43,6 +43,12 @@ type MarketEvent struct {
 	Volume    int64     `json:"volume" validate:"required,gte=0"`
 	Timestamp time.Time `json:"timestamp" validate:"required"`
 	Type      string    `json:"type" validate:"required,oneof=trade quote bar"`
+
+	// OHLC fields for bar events (optional, only used when Type == "bar")
+	Open  float64 `json:"open,omitempty"`
+	High  float64 `json:"high,omitempty"`
+	Low   float64 `json:"low,omitempty"`
+	Close float64 `json:"close,omitempty"`
 }
 
 // REQ-076: Market hours validation

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useThemeStore } from '../../stores/themeStore';
+import ThemeToggle from '../ui/ThemeToggle';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,7 +8,6 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const { theme, toggleTheme } = useThemeStore();
 
   const navigationItems = [
     { path: '/dashboard', name: 'Dashboard', icon: '📊' },
@@ -61,13 +60,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {/* Theme Toggle */}
             <div className="flex items-center space-x-4">
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-md text-muted-foreground hover:text-card-foreground hover:bg-accent transition-colors"
-                aria-label="Toggle theme"
-              >
-                {theme === 'light' ? '🌙' : theme === 'dark' ? '☀️' : '🌓'}
-              </button>
+              <ThemeToggle />
             </div>
           </div>
         </div>

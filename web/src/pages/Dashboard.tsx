@@ -1,5 +1,6 @@
 import React from 'react';
 import { useChartStore } from '../stores/chartStore';
+import useWebSocket from '../hooks/useWebSocket';
 import CandlestickChart from '../components/charts/CandlestickChart';
 import SymbolSelector from '../components/forms/SymbolSelector';
 import TimeframeSelector from '../components/forms/TimeframeSelector';
@@ -18,6 +19,9 @@ const Dashboard: React.FC = () => {
     lastUpdate 
   } = useChartStore();
 
+  // Initialize WebSocket connection
+  const { isConnected } = useWebSocket();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -31,6 +35,25 @@ const Dashboard: React.FC = () => {
         
         <div className="flex items-center gap-4">
           <MarketStatus />
+          
+          {/* WebSocket Connection Status */}
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
+            isConnected 
+              ? 'bg-blue-100 dark:bg-blue-900/20' 
+              : 'bg-gray-100 dark:bg-gray-900/20'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${
+              isConnected ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
+            }`} />
+            <span className={`text-sm font-medium ${
+              isConnected 
+                ? 'text-blue-700 dark:text-blue-400' 
+                : 'text-gray-600 dark:text-gray-400'
+            }`}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
+          
           {isStreaming && (
             <div className="flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded-full">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />

@@ -1,0 +1,89 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+/* Custom CSS Variables */
+:root {
+  --color-background: 255 255 255;
+  --color-foreground: 9 9 11;
+  --color-border: 229 229 229;
+  --color-card: 255 255 255;
+  --color-card-foreground: 9 9 11;
+  --color-muted: 245 245 245;
+  --color-muted-foreground: 113 113 122;
+  --color-accent: 245 245 245;
+  --color-primary: 59 130 246;
+  --color-primary-foreground: 255 255 255;
+  --color-destructive: 239 68 68;
+}
+
+.dark {
+  --color-background: 9 9 11;
+  --color-foreground: 250 250 250;
+  --color-border: 39 39 42;
+  --color-card: 24 24 27;
+  --color-card-foreground: 250 250 250;
+  --color-muted: 39 39 42;
+  --color-muted-foreground: 161 161 170;
+  --color-accent: 39 39 42;
+  --color-primary: 59 130 246;
+  --color-primary-foreground: 255 255 255;
+  --color-destructive: 239 68 68;
+}
+
+/* Utility Classes */
+.bg-background {
+  background-color: rgb(var(--color-background));
+}
+
+.text-foreground {
+  color: rgb(var(--color-foreground));
+}
+
+.border-border {
+  border-color: rgb(var(--color-border));
+}
+
+.bg-card {
+  background-color: rgb(var(--color-card));
+}
+
+.text-card-foreground {
+  color: rgb(var(--color-card-foreground));
+}
+
+.bg-muted {
+  background-color: rgb(var(--color-muted));
+}
+
+.text-muted-foreground {
+  color: rgb(var(--color-muted-foreground));
+}
+
+.bg-accent {
+  background-color: rgb(var(--color-accent));
+}
+
+.bg-primary {
+  background-color: rgb(var(--color-primary));
+}
+
+.text-primary-foreground {
+  color: rgb(var(--color-primary-foreground));
+}
+
+.bg-primary\/90 {
+  background-color: rgb(var(--color-primary) / 0.9);
+}
+
+.text-destructive {
+  color: rgb(var(--color-destructive));
+}
+
+.bg-destructive\/10 {
+  background-color: rgb(var(--color-destructive) / 0.1);
+}
+
+.border-destructive\/20 {
+  border-color: rgb(var(--color-destructive) / 0.2);
+}

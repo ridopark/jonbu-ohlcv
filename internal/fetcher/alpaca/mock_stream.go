@@ -65,14 +65,14 @@ func NewMockStreamClient(apiKey, secretKey, baseURL string, logger zerolog.Logge
 		}
 	}
 
-	candleIntervalSec := 6 // Default 6 seconds (10x speed for 1-minute candles)
+	candleIntervalSec := 6.0 // Default 6 seconds (10x speed for 1-minute candles)
 	if envInterval := os.Getenv("ALPACA_MOCK_CANDLE_INTERVAL_SEC"); envInterval != "" {
-		if parsed, err := strconv.Atoi(envInterval); err == nil && parsed > 0 {
+		if parsed, err := strconv.ParseFloat(envInterval, 64); err == nil && parsed > 0 {
 			candleIntervalSec = parsed
 		}
 	}
 
-	candleInterval := time.Duration(candleIntervalSec) * time.Second
+	candleInterval := time.Duration(candleIntervalSec * float64(time.Second))
 
 	logger.Info().
 		Float64("speed_multiplier", speedMultiplier).
@@ -262,6 +262,11 @@ func (m *MockStreamClient) generateMockData() {
 					Timestamp: candle.Timestamp,
 					Price:     candle.Close, // Use close price as primary price
 					Volume:    candle.Volume,
+					// Include full OHLC data for bar events
+					Open:  candle.Open,
+					High:  candle.High,
+					Low:   candle.Low,
+					Close: candle.Close,
 				}
 
 				select {
@@ -292,38 +297,41 @@ func (m *MockStreamClient) generateMockData() {
 func (m *MockStreamClient) generateMockCandle(data *MockSymbolData) models.Candle {
 	now := time.Now()
 
-	// Simulate market volatility with random walk
-	change := (rand.Float64() - 0.5) * 0.02 // 2% max change per candle
-
-	// Apply trend bias
-	change += data.Trend * 0.005 // Trend influences direction
-
-	// Calculate OHLCV based on current price and change
+	// Simulate realistic OHLC candle with proper intraday movement
 	open := data.CurrentPrice
-	high := open
-	low := open
-	close := open * (1 + change)
 
-	// Ensure close is within reasonable bounds
+	// Generate realistic close price with trend and volatility
+	priceChangePercent := (rand.Float64() - 0.5) * 0.03 // ±1.5% max change per candle
+	priceChangePercent += data.Trend * 0.008            // Trend bias influence
+
+	close := open * (1 + priceChangePercent)
 	if close <= 0 {
-		close = open * 0.99 // Minimum 1% down
+		close = open * 0.995 // Minimum 0.5% down
 	}
 
-	// Generate realistic intraday high/low
-	volatility := 0.005 + rand.Float64()*0.01 // 0.5% to 1.5% intraday range
-	highChange := rand.Float64() * volatility
-	lowChange := rand.Float64() * volatility
+	// Generate realistic intraday high/low with proper ranges
+	// High should be >= max(open, close), Low should be <= min(open, close)
+	volatilityRange := 0.005 + rand.Float64()*0.015 // 0.5% to 2% intraday range
 
-	high = math.Max(open, close) * (1 + highChange)
-	low = math.Min(open, close) * (1 - lowChange)
+	maxOC := math.Max(open, close)
+	minOC := math.Min(open, close)
 
-	// Ensure OHLC consistency
-	if high < math.Max(open, close) {
-		high = math.Max(open, close)
+	// High: always >= max(open, close) with additional upward movement
+	highBoost := rand.Float64() * volatilityRange // 0-2% above max(O,C)
+	high := maxOC * (1 + highBoost)
+
+	// Low: always <= min(open, close) with additional downward movement
+	lowDrop := rand.Float64() * volatilityRange // 0-2% below min(O,C)
+	low := minOC * (1 - lowDrop)
+
+	// Ensure absolute bounds (no negative prices, reasonable ranges)
+	if low <= 0 {
+		low = minOC * 0.99
 	}
-	if low > math.Min(open, close) {
-		low = math.Min(open, close)
-	}
+
+	// Final consistency check: H >= max(O,H,L,C) and L <= min(O,H,L,C)
+	high = math.Max(high, math.Max(open, close))
+	low = math.Min(low, math.Min(open, close))
 
 	// Generate realistic volume (higher during market hours)
 	baseVolume := int64(1000 + rand.Intn(5000))
@@ -347,7 +355,7 @@ func (m *MockStreamClient) generateMockCandle(data *MockSymbolData) models.Candl
 
 	candle := models.Candle{
 		Symbol:     data.Symbol,
-		Timestamp:  now.Truncate(time.Minute), // Align to minute boundary
+		Timestamp:  now, // Use full timestamp with seconds/milliseconds for uniqueness
 		Open:       open,
 		High:       high,
 		Low:        low,

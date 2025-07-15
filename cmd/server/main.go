@@ -17,6 +17,7 @@ import (
 	"github.com/ridopark/jonbu-ohlcv/internal/database"
 	"github.com/ridopark/jonbu-ohlcv/internal/fetcher/alpaca"
 	"github.com/ridopark/jonbu-ohlcv/internal/logger"
+	"github.com/ridopark/jonbu-ohlcv/internal/models"
 	"github.com/ridopark/jonbu-ohlcv/internal/stream"
 	"github.com/ridopark/jonbu-ohlcv/internal/worker"
 	"github.com/ridopark/jonbu-ohlcv/pkg/api/handlers"
@@ -102,6 +103,7 @@ func initializeServer() (*Server, error) {
 	poolConfig := worker.DefaultPoolConfig()
 	poolConfig.MaxWorkers = cfg.Worker.MaxWorkersPerSymbol * 10 // Scale for multiple symbols
 	poolConfig.EventBufferSize = cfg.Worker.BufferSize
+	poolConfig.UseMockMode = cfg.Alpaca.UseMock // Pass mock mode to workers
 	workerPool := worker.NewPool(poolConfig, appLogger)
 
 	// Initialize Alpaca stream client using factory
@@ -240,6 +242,13 @@ func (s *Server) Start() error {
 func (s *Server) runDataPipeline() {
 	s.logger.Info().Msg("Starting data pipeline")
 
+	// Create OHLCV repository for database storage
+	repo, err := database.NewOHLCVRepository(s.db)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to create OHLCV repository for pipeline")
+		return
+	}
+
 	// Stream events from Alpaca to worker pool
 	go func() {
 		for event := range s.alpacaStream.GetOutput() {
@@ -247,11 +256,15 @@ func (s *Server) runDataPipeline() {
 		}
 	}()
 
-	// Stream candles from worker pool to WebSocket clients
+	// Stream candles from worker pool to WebSocket clients AND database
 	go func() {
 		hub := s.streamServer.GetHub()
 		for candle := range s.workerPool.GetCandleOutput() {
+			// Broadcast to WebSocket clients
 			hub.BroadcastCandle(candle.Symbol, candle.Interval, &candle)
+
+			// Store in database for historical data
+			go s.storeCandleToDatabase(repo, &candle)
 		}
 	}()
 }
@@ -285,6 +298,71 @@ func (s *Server) WaitForShutdown() {
 	}
 
 	s.logger.Info().Msg("Server shutdown complete")
+}
+
+// storeCandleToDatabase persists aggregated candles to PostgreSQL
+func (s *Server) storeCandleToDatabase(repo *database.OHLCVRepository, candle *models.Candle) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Convert timeframe from internal format to database format
+	dbTimeframe := s.convertTimeframeForDB(candle.Interval)
+
+	// Convert candle to OHLCV model for database storage
+	ohlcv := &models.OHLCV{
+		Symbol:    candle.Symbol,
+		Timestamp: candle.Timestamp,
+		Open:      candle.Open,
+		High:      candle.High,
+		Low:       candle.Low,
+		Close:     candle.Close,
+		Volume:    candle.Volume,
+		Timeframe: dbTimeframe, // Use converted timeframe
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	// Insert candle into database
+	if err := repo.Insert(ctx, ohlcv); err != nil {
+		s.logger.Error().Err(err).
+			Str("symbol", candle.Symbol).
+			Str("internal_timeframe", candle.Interval).
+			Str("db_timeframe", dbTimeframe).
+			Time("timestamp", candle.Timestamp).
+			Msg("Failed to store candle to database")
+	} else {
+		s.logger.Debug().
+			Str("symbol", candle.Symbol).
+			Str("timeframe", dbTimeframe).
+			Time("timestamp", candle.Timestamp).
+			Float64("close", candle.Close).
+			Msg("Successfully stored candle to database")
+	}
+}
+
+// convertTimeframeForDB converts internal timeframe format to database format
+func (s *Server) convertTimeframeForDB(timeframe string) string {
+	switch timeframe {
+	case "1min":
+		return "1m"
+	case "5min":
+		return "5m"
+	case "15min":
+		return "15m"
+	case "30min":
+		return "30m"
+	case "1hour":
+		return "1h"
+	case "4hour":
+		return "4h"
+	case "1day":
+		return "1d"
+	default:
+		s.logger.Warn().
+			Str("timeframe", timeframe).
+			Msg("Unknown timeframe format, defaulting to 1m")
+		return "1m"
+	}
 }
 
 // HTTP Handlers

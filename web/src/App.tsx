@@ -12,20 +12,25 @@ import ErrorFallback from './components/ui/ErrorFallback';
 import { useThemeStore } from './stores/themeStore';
 
 const App: React.FC = () => {
-  const { theme } = useThemeStore();
+  const { theme, resolvedTheme, setTheme } = useThemeStore();
 
   React.useEffect(() => {
-    // Apply theme to document root
-    if (theme === 'dark') {
+    // Initialize theme on app start
+    setTheme(theme);
+  }, []);
+
+  React.useEffect(() => {
+    // Apply resolved theme to document root
+    if (resolvedTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [theme]);
+  }, [resolvedTheme]);
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <div className={`min-h-screen bg-background text-foreground ${theme}`}>
+      <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
         <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
