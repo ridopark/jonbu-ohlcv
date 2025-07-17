@@ -870,62 +870,110 @@ const Dashboard: React.FC = () => {
               
               {enrichedCandles.slice(-1).map((candle, index) => {
                 const indicators = (candle as any).data?.indicators;
-                const analysis = (candle as any).data?.analysis;
                 const atr = indicators?.atr;
-                const volatilityLevel = analysis?.volatility_level;
-                const volatilityPercent = analysis?.volatility_percent;
+                const currentPrice = candle.close;
                 const timestamp = new Date(candle.timestamp).toLocaleTimeString();
+                
+                // Calculate ATR as percentage of current price
+                const atrPercent = atr && currentPrice ? (atr / currentPrice) * 100 : null;
+                
+                // Determine volatility classification based on ATR%
+                let volatilityClassification = 'Moderate';
+                let volatilityColor = 'text-yellow-600';
+                let volatilityBg = 'bg-yellow-100 dark:bg-yellow-900/20';
+                let volatilityIcon = '🟡';
+                
+                if (atrPercent !== null) {
+                  if (atrPercent < 1) {
+                    volatilityClassification = 'Low';
+                    volatilityColor = 'text-green-600';
+                    volatilityBg = 'bg-green-100 dark:bg-green-900/20';
+                    volatilityIcon = '🟢';
+                  } else if (atrPercent > 3) {
+                    volatilityClassification = 'High';
+                    volatilityColor = 'text-red-600';
+                    volatilityBg = 'bg-red-100 dark:bg-red-900/20';
+                    volatilityIcon = '🔴';
+                  }
+                }
                 
                 return (
                   <div key={`atr-${candle.timestamp}-${index}`} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">ATR Value:</span>
-                      <span className="text-lg font-bold text-orange-600">
-                        {atr ? atr.toFixed(3) : 'N/A'}
-                      </span>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">ATR Value:</span>
+                        <div className="font-mono text-orange-600 font-bold">
+                          {atr ? atr.toFixed(3) : 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Current Price:</span>
+                        <div className="font-mono text-blue-600 font-bold">
+                          ${currentPrice ? currentPrice.toFixed(2) : 'N/A'}
+                        </div>
+                      </div>
                     </div>
                     
-                    {volatilityPercent && (
+                    {atrPercent !== null && (
                       <div className="space-y-2">
+                        <div className="text-center">
+                          <div className="text-muted-foreground text-xs mb-1">ATR as % of Price</div>
+                          <div className="text-2xl font-bold text-orange-600">
+                            {atrPercent.toFixed(2)}%
+                          </div>
+                        </div>
+                        
+                        {/* ATR Percentage Progress Bar */}
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                           <div 
                             className={`h-3 rounded-full transition-all duration-300 ${
-                              volatilityLevel === 'high' ? 'bg-red-500' : 
-                              volatilityLevel === 'low' ? 'bg-green-500' : 
+                              atrPercent < 1 ? 'bg-green-500' : 
+                              atrPercent > 3 ? 'bg-red-500' : 
                               'bg-yellow-500'
                             }`}
-                            style={{ width: `${Math.min(volatilityPercent, 100)}%` }}
+                            style={{ width: `${Math.min(atrPercent * 25, 100)}%` }}
                           />
                         </div>
                         
                         <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Low (0%)</span>
-                          <span>Normal (50%)</span>
-                          <span>High (100%)</span>
+                          <span>Low (&lt;1%)</span>
+                          <span>Moderate (1-3%)</span>
+                          <span>High (&gt;3%)</span>
                         </div>
                       </div>
                     )}
                     
-                    {volatilityLevel && (
-                      <div className="text-center">
-                        <span className={`text-sm font-medium px-2 py-1 rounded ${
-                          volatilityLevel === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' : 
-                          volatilityLevel === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 
-                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400'
-                        }`}>
-                          {volatilityLevel === 'high' ? '🔴 HIGH VOLATILITY' : 
-                           volatilityLevel === 'low' ? '🟢 LOW VOLATILITY' : 
-                           '🟡 NORMAL VOLATILITY'}
-                        </span>
-                      </div>
-                    )}
+                    {/* Volatility Classification */}
+                    <div className="text-center">
+                      <span className={`text-sm font-medium px-3 py-1 rounded-full ${volatilityBg} ${volatilityColor}`}>
+                        {volatilityIcon} {volatilityClassification.toUpperCase()} VOLATILITY
+                      </span>
+                    </div>
                     
-                    {volatilityPercent && (
-                      <div className="text-center text-sm">
-                        <span className="text-muted-foreground">Volatility Level: </span>
-                        <span className="font-medium text-orange-600">{volatilityPercent.toFixed(0)}%</span>
+                    {/* ATR Behavior Guide */}
+                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+                        <div className="font-semibold mb-2 text-center">📊 ATR Trading Guide</div>
+                        <div className="grid grid-cols-1 gap-1">
+                          <div className="flex items-center gap-1">
+                            <span>🔺</span>
+                            <span><strong>Increasing ATR:</strong> Higher volatility, more risk</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>🔻</span>
+                            <span><strong>Decreasing ATR:</strong> Lower volatility, calmer market</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>📍</span>
+                            <span><strong>High ATR:</strong> Large swings, wider stops needed</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>📍</span>
+                            <span><strong>Low ATR:</strong> Small moves, tighter stops possible</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    </div>
                     
                     <div className="text-xs text-muted-foreground text-center">
                       Updated: {timestamp}
