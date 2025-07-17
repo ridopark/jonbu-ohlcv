@@ -240,6 +240,18 @@ export class WebSocketClient {
         volume: message.data?.volume
       });
       this.emit('candle', message);
+    } else if (message.type === 'enriched_candle') {
+      console.log('🔮 Processing enriched candle data:', {
+        symbol: message.symbol || message.data?.symbol,
+        timeframe: message.timeframe || message.data?.interval,
+        timestamp: message.data?.timestamp,
+        close: message.data?.close,
+        volume: message.data?.volume,
+        indicators: Object.keys(message.data || {}).filter(key => 
+          !['symbol', 'timestamp', 'open', 'high', 'low', 'close', 'volume', 'interval'].includes(key)
+        )
+      });
+      this.emit('enriched_candle', message);
     } else if (message.type === 'error') {
       console.error('❌ WebSocket error received:', message);
       this.emit('error', message);

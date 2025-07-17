@@ -2,7 +2,19 @@ import React from 'react';
 import { useChartStore } from '../../stores/chartStore';
 
 const CandlestickChart: React.FC = () => {
-  const { candles, enrichedCandles, symbol, timeframe, showIndicators } = useChartStore();
+  const { candles, enrichedCandles, symbol, timeframe } = useChartStore();
+  
+  // Debug logging
+  React.useEffect(() => {
+    console.log('📊 Chart component state update:', {
+      symbol,
+      timeframe,
+      candlesCount: candles.length,
+      enrichedCandlesCount: enrichedCandles.length,
+      firstCandle: candles[0],
+      lastCandle: candles[candles.length - 1]
+    });
+  }, [candles, enrichedCandles, symbol, timeframe]);
   
   // For now, we'll create a simple placeholder chart
   // In a real implementation, this would use a charting library like Recharts or Chart.js
@@ -118,18 +130,35 @@ const CandlestickChart: React.FC = () => {
             <div className="w-3 h-3 bg-red-500 rounded" />
             <span>Bearish</span>
           </div>
+          {enrichedCandles.length > 0 && (
+            <>
+              <div className="flex items-center gap-1 ml-4">
+                <div className="w-4 h-0.5 bg-blue-500" />
+                <span>SMA 20</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-0.5 bg-purple-500" />
+                <span>SMA 50</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-0.5 bg-orange-500" />
+                <span>RSI</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Main Chart Area */}
       <div className="relative bg-background border border-border rounded-lg p-4">
-        <div className="h-80 relative overflow-hidden">
+        <div className="h-96 relative overflow-hidden">
           {/* Price Chart */}
           <svg
             width="100%"
             height="240"
-            viewBox="0 0 800 240"
+            viewBox="0 0 1000 240"
             className="absolute top-0 left-0"
+            preserveAspectRatio="none"
           >
             {/* Grid lines */}
             <defs>
@@ -141,7 +170,7 @@ const CandlestickChart: React.FC = () => {
             
             {/* Candlesticks */}
             {chartData.map((candle, index) => {
-              const x = (index / (chartData.length - 1)) * 780 + 10;
+              const x = (index / (chartData.length - 1)) * 980 + 10;
               const isGreen = candle.close > candle.open;
               
               // Scale prices to chart height with NaN protection
@@ -191,6 +220,70 @@ const CandlestickChart: React.FC = () => {
               );
             }).filter(Boolean)}
             
+            {/* Technical Indicator Lines */}
+            {enrichedCandles.length > 1 && (() => {
+              // Scale price function for indicators
+              const scalePrice = (price: number) => {
+                if (!isFinite(price) || isNaN(price)) return 110;
+                const range = priceRange.max - priceRange.min;
+                if (range === 0) return 110;
+                return 220 - ((price - priceRange.min) / range) * 200;
+              };
+              
+              // Get enriched candles that match our chart data timeframe
+              const enrichedChartData = chartData.map(candle => 
+                enrichedCandles.find(e => e.timestamp === candle.timestamp)
+              ).filter(Boolean);
+              
+              if (enrichedChartData.length < 2) return null;
+              
+              // SMA 20 Line
+              const sma20Points = enrichedChartData
+                .map((enriched, index) => {
+                  if (!enriched || typeof enriched.sma20 !== 'number') return null;
+                  const x = (index / (chartData.length - 1)) * 980 + 10;
+                  const y = scalePrice(enriched.sma20);
+                  return { x, y };
+                })
+                .filter((p): p is { x: number; y: number } => p !== null);
+              
+              // SMA 50 Line  
+              const sma50Points = enrichedChartData
+                .map((enriched, index) => {
+                  if (!enriched || typeof enriched.sma50 !== 'number') return null;
+                  const x = (index / (chartData.length - 1)) * 980 + 10;
+                  const y = scalePrice(enriched.sma50);
+                  return { x, y };
+                })
+                .filter((p): p is { x: number; y: number } => p !== null);
+              
+              return (
+                <g>
+                  {/* SMA 20 Line */}
+                  {sma20Points.length > 1 && (
+                    <polyline
+                      points={sma20Points.map(p => `${p.x},${p.y}`).join(' ')}
+                      fill="none"
+                      stroke="rgb(59, 130, 246)"
+                      strokeWidth="2"
+                      opacity="0.8"
+                    />
+                  )}
+                  
+                  {/* SMA 50 Line */}
+                  {sma50Points.length > 1 && (
+                    <polyline
+                      points={sma50Points.map(p => `${p.x},${p.y}`).join(' ')}
+                      fill="none"
+                      stroke="rgb(147, 51, 234)"
+                      strokeWidth="2"
+                      opacity="0.8"
+                    />
+                  )}
+                </g>
+              );
+            })()}
+            
             {/* Price labels */}
             <g className="text-xs fill-current text-muted-foreground">
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
@@ -213,11 +306,12 @@ const CandlestickChart: React.FC = () => {
           <svg
             width="100%"
             height="60"
-            viewBox="0 0 800 60"
+            viewBox="0 0 1000 60"
             className="absolute bottom-0 left-0"
+            preserveAspectRatio="none"
           >
             {chartData.map((candle, index) => {
-              const x = (index / (chartData.length - 1)) * 780 + 10;
+              const x = (index / (chartData.length - 1)) * 980 + 10;
               const height = (candle.volume / volumeRange.max) * 50;
               const isGreen = candle.close > candle.open;
               
@@ -247,6 +341,57 @@ const CandlestickChart: React.FC = () => {
               0
             </text>
           </svg>
+          
+          {/* RSI Chart - Separate panel below main chart */}
+          <svg
+            width="100%"
+            height="80"
+            viewBox="0 0 1000 80"
+            className="absolute bottom-16 left-0"
+            preserveAspectRatio="none"
+          >
+            {/* RSI Background */}
+            <rect width="100%" height="100%" fill="rgba(0,0,0,0.02)" />
+            
+            {/* RSI Overbought/Oversold lines */}
+            <line x1="0" y1="16" x2="1000" y2="16" stroke="rgb(239, 68, 68)" strokeWidth="1" strokeDasharray="2,2" opacity="0.5" />
+            <line x1="0" y1="64" x2="1000" y2="64" stroke="rgb(16, 185, 129)" strokeWidth="1" strokeDasharray="2,2" opacity="0.5" />
+            <line x1="0" y1="40" x2="1000" y2="40" stroke="rgb(156, 163, 175)" strokeWidth="1" strokeDasharray="1,1" opacity="0.3" />
+            
+            {/* RSI Line */}
+            {enrichedCandles.length > 1 && (() => {
+              const enrichedChartData = chartData.map(candle => 
+                enrichedCandles.find(e => e.timestamp === candle.timestamp)
+              ).filter(Boolean);
+              
+              if (enrichedChartData.length < 2) return null;
+              
+              const rsiPoints = enrichedChartData
+                .map((enriched, index) => {
+                  if (!enriched || typeof enriched.rsi !== 'number') return null;
+                  const x = (index / (chartData.length - 1)) * 980 + 10;
+                  const y = 80 - (enriched.rsi / 100) * 80; // Scale RSI 0-100 to chart height
+                  return { x, y };
+                })
+                .filter((p): p is { x: number; y: number } => p !== null);
+              
+              return rsiPoints.length > 1 ? (
+                <polyline
+                  points={rsiPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                  fill="none"
+                  stroke="rgb(251, 146, 60)"
+                  strokeWidth="2"
+                  opacity="0.9"
+                />
+              ) : null;
+            })()}
+            
+            {/* RSI Labels */}
+            <text x="5" y="12" className="text-xs fill-current text-red-600">70</text>
+            <text x="5" y="36" className="text-xs fill-current text-muted-foreground">50</text>
+            <text x="5" y="68" className="text-xs fill-current text-green-600">30</text>
+            <text x="5" y="78" className="text-xs fill-current text-muted-foreground">RSI</text>
+          </svg>
         </div>
         
         {/* Chart Footer */}
@@ -255,60 +400,6 @@ const CandlestickChart: React.FC = () => {
           <span>Price: {formatPrice(priceRange.min)} - {formatPrice(priceRange.max)}</span>
         </div>
       </div>
-      
-      {/* Technical Indicators */}
-      {showIndicators && enrichedCandles.length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-4">
-          <h4 className="text-sm font-medium text-card-foreground mb-3">
-            Technical Indicators
-          </h4>
-          
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-            {(() => {
-              const latest = enrichedCandles[enrichedCandles.length - 1];
-              if (!latest) return null;
-              
-              return (
-                <>
-                  {latest.sma20 && (
-                    <div>
-                      <span className="text-muted-foreground">SMA 20:</span>
-                      <span className="ml-2 font-medium">{formatPrice(latest.sma20)}</span>
-                    </div>
-                  )}
-                  
-                  {latest.ema50 && (
-                    <div>
-                      <span className="text-muted-foreground">EMA 50:</span>
-                      <span className="ml-2 font-medium">{formatPrice(latest.ema50)}</span>
-                    </div>
-                  )}
-                  
-                  {latest.rsi && (
-                    <div>
-                      <span className="text-muted-foreground">RSI:</span>
-                      <span className={`ml-2 font-medium ${
-                        latest.rsi > 70 ? 'text-red-600' : 
-                        latest.rsi < 30 ? 'text-green-600' : 
-                        'text-card-foreground'
-                      }`}>
-                        {latest.rsi.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {latest.macd && (
-                    <div>
-                      <span className="text-muted-foreground">MACD:</span>
-                      <span className="ml-2 font-medium">{latest.macd.toFixed(4)}</span>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -129,113 +129,143 @@ const Dashboard: React.FC = () => {
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Latest Candles */}
+        {/* Latest Candles Stream */}
         <div className="bg-card rounded-lg border border-border p-6">
           <h3 className="text-lg font-semibold text-card-foreground mb-4">
-            Latest Candles
+            Latest Candles Stream
+            <span className="text-sm text-muted-foreground ml-2">
+              (Real-time Log)
+            </span>
           </h3>
           
-          <div className="space-y-2">
-            {candles.slice(-5).reverse().map((candle, index) => (
-              <div 
-                key={`${candle.timestamp}-${index}`}
-                className="flex items-center justify-between p-3 bg-muted rounded-md"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    candle.close > candle.open ? 'bg-green-500' : 'bg-red-500'
-                  }`} />
-                  <div>
-                    <p className="text-sm font-medium text-card-foreground">
-                      {new Date(candle.timestamp).toLocaleTimeString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Vol: {candle.volume.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+          {candles.length > 0 ? (
+            <div className="h-64 overflow-y-auto bg-muted/50 rounded-md p-3 space-y-2 font-mono text-xs">
+              {candles.slice(-10).reverse().map((candle, index) => {
+                const timestamp = new Date(candle.timestamp).toLocaleTimeString();
+                const isGreen = candle.close > candle.open;
+                const priceChange = candle.close - candle.open;
+                const priceChangePercent = (priceChange / candle.open) * 100;
                 
-                <div className="text-right">
-                  <p className="text-sm font-medium text-card-foreground">
-                    ${candle.close.toFixed(2)}
-                  </p>
-                  <p className={`text-xs ${
-                    candle.close > candle.open ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {candle.close > candle.open ? '+' : ''}
-                    {((candle.close - candle.open) / candle.open * 100).toFixed(2)}%
-                  </p>
-                </div>
+                return (
+                  <div key={`candle-${candle.timestamp}-${index}`} className="text-left border-b border-border/50 pb-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-muted-foreground">
+                        [{timestamp}] {symbol}
+                      </div>
+                      <div className={`flex items-center gap-1 ${isGreen ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`w-2 h-2 rounded-full ${isGreen ? 'bg-green-500' : 'bg-red-500'}`} />
+                        <span className="font-medium">${candle.close.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-card-foreground">
+                      <div>O: <span className="text-blue-600">${candle.open.toFixed(2)}</span></div>
+                      <div>H: <span className="text-green-600">${candle.high.toFixed(2)}</span></div>
+                      <div>L: <span className="text-red-600">${candle.low.toFixed(2)}</span></div>
+                      <div>Vol: <span className="text-purple-600">{candle.volume.toLocaleString()}</span></div>
+                    </div>
+                    
+                    <div className="mt-1 text-right">
+                      <span className={`text-xs ${isGreen ? 'text-green-600' : 'text-red-600'}`}>
+                        {isGreen ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent.toFixed(2)}%)
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Auto-scroll indicator */}
+              <div className="text-center text-muted-foreground text-xs pt-2">
+                ↑ Latest candles above • Streaming live updates
               </div>
-            ))}
-            
-            {candles.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No candle data available
-              </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-muted/50 rounded-md">
+              <div className="text-center">
+                <div className="text-2xl mb-2">📊</div>
+                <p className="text-sm text-muted-foreground">
+                  Waiting for candle data...
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  OHLCV candles will stream here in real-time
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Technical Indicators Summary */}
+        {/* Technical Indicators Stream */}
         <div className="bg-card rounded-lg border border-border p-6">
           <h3 className="text-lg font-semibold text-card-foreground mb-4">
-            Technical Indicators
+            Technical Indicators Stream
+            <span className="text-sm text-muted-foreground ml-2">
+              (Real-time Log)
+            </span>
           </h3>
           
           {enrichedCandles.length > 0 ? (
-            <div className="space-y-3">
-              {(() => {
-                const latest = enrichedCandles[enrichedCandles.length - 1];
+            <div className="h-64 overflow-y-auto bg-muted/50 rounded-md p-3 space-y-2 font-mono text-xs">
+              {enrichedCandles.slice(-10).reverse().map((candle, index) => {
+                const timestamp = new Date(candle.timestamp).toLocaleTimeString();
+                
                 return (
-                  <>
-                    {latest.sma20 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">SMA 20</span>
-                        <span className="text-sm font-medium text-card-foreground">
-                          ${latest.sma20.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
+                  <div key={`indicator-${candle.timestamp}-${index}`} className="text-left border-b border-border/50 pb-2">
+                    <div className="text-muted-foreground mb-1">
+                      [{timestamp}] {symbol} Indicators:
+                    </div>
                     
-                    {latest.ema50 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">EMA 50</span>
-                        <span className="text-sm font-medium text-card-foreground">
-                          ${latest.ema50.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {latest.rsi && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">RSI</span>
-                        <span className={`text-sm font-medium ${
-                          latest.rsi > 70 ? 'text-red-600' : 
-                          latest.rsi < 30 ? 'text-green-600' : 
-                          'text-card-foreground'
-                        }`}>
-                          {latest.rsi.toFixed(1)}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {latest.macd && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">MACD</span>
-                        <span className="text-sm font-medium text-card-foreground">
-                          {latest.macd.toFixed(4)}
-                        </span>
-                      </div>
-                    )}
-                  </>
+                    <div className="grid grid-cols-2 gap-2 text-card-foreground">
+                      {/* SMA 20 */}
+                      {typeof candle.sma20 === 'number' && (
+                        <div>SMA20: <span className="text-blue-600">${candle.sma20.toFixed(2)}</span></div>
+                      )}
+                      
+                      {/* SMA 50 */}
+                      {typeof candle.sma50 === 'number' && (
+                        <div>SMA50: <span className="text-purple-600">${candle.sma50.toFixed(2)}</span></div>
+                      )}
+                      
+                      {/* RSI */}
+                      {typeof candle.rsi === 'number' ? (
+                        <div>RSI: <span className={
+                          candle.rsi > 70 ? 'text-red-600' : 
+                          candle.rsi < 30 ? 'text-green-600' : 
+                          'text-yellow-600'
+                        }>{candle.rsi.toFixed(1)}</span></div>
+                      ) : (
+                        <div>RSI: <span className="text-gray-500">N/A</span></div>
+                      )}
+                      
+                      {/* MACD */}
+                      {candle.macd && typeof candle.macd === 'object' && 'line' in candle.macd && typeof (candle.macd as any).line === 'number' ? (
+                        <div>MACD: <span className="text-cyan-600">{((candle.macd as any).line as number).toFixed(4)}</span></div>
+                      ) : typeof candle.macd === 'number' ? (
+                        <div>MACD: <span className="text-cyan-600">{candle.macd.toFixed(4)}</span></div>
+                      ) : (
+                        <div>MACD: <span className="text-gray-500">N/A</span></div>
+                      )}
+                    </div>
+                  </div>
                 );
-              })()}
+              })}
+              
+              {/* Auto-scroll indicator */}
+              <div className="text-center text-muted-foreground text-xs pt-2">
+                ↑ Latest indicators above • Streaming live updates
+              </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No enriched data available
-            </p>
+            <div className="h-64 flex items-center justify-center bg-muted/50 rounded-md">
+              <div className="text-center">
+                <div className="text-2xl mb-2">📊</div>
+                <p className="text-sm text-muted-foreground">
+                  Waiting for enriched data...
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Technical indicators will stream here in real-time
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </div>

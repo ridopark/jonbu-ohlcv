@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/ridopark/jonbu-ohlcv/internal/models"
 	"github.com/rs/zerolog"
 )
 
@@ -48,12 +47,13 @@ type ClientMessage struct {
 
 // ServerMessage represents messages to clients
 type ServerMessage struct {
-	Type      string         `json:"type"`
-	Symbol    string         `json:"symbol,omitempty"`
-	Timeframe string         `json:"timeframe,omitempty"`
-	Data      *models.Candle `json:"data,omitempty"`
-	Error     string         `json:"error,omitempty"`
-	Timestamp time.Time      `json:"timestamp"`
+	Type      string      `json:"type"`
+	Symbol    string      `json:"symbol,omitempty"`
+	Timeframe string      `json:"timeframe,omitempty"`
+	Interval  string      `json:"interval,omitempty"` // Add interval field at top level
+	Data      interface{} `json:"data,omitempty"`
+	Error     string      `json:"error,omitempty"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
 // NewClient creates a new WebSocket client

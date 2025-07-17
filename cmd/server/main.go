@@ -15,6 +15,7 @@ import (
 
 	"github.com/ridopark/jonbu-ohlcv/internal/config"
 	"github.com/ridopark/jonbu-ohlcv/internal/database"
+	"github.com/ridopark/jonbu-ohlcv/internal/enrichment"
 	"github.com/ridopark/jonbu-ohlcv/internal/fetcher/alpaca"
 	"github.com/ridopark/jonbu-ohlcv/internal/logger"
 	"github.com/ridopark/jonbu-ohlcv/internal/models"
@@ -36,9 +37,10 @@ type Server struct {
 	db     *database.DB
 
 	// Streaming components
-	streamServer *stream.Server
-	workerPool   *worker.Pool
-	alpacaStream alpaca.StreamInterface
+	streamServer     *stream.Server
+	workerPool       *worker.Pool
+	alpacaStream     alpaca.StreamInterface
+	enrichmentEngine *enrichment.CandleEnrichmentEngine
 
 	// HTTP server
 	httpServer *http.Server
@@ -118,16 +120,21 @@ func initializeServer() (*Server, error) {
 	// Create HTTP router
 	router := mux.NewRouter()
 
+	// Create enrichment engine
+	enrichmentConfig := enrichment.DefaultEnrichmentConfig()
+	enrichmentEngine := enrichment.NewCandleEnrichmentEngine(enrichmentConfig)
+
 	server := &Server{
-		config:       cfg,
-		logger:       appLogger,
-		db:           db,
-		streamServer: streamServer,
-		workerPool:   workerPool,
-		alpacaStream: alpacaStream,
-		router:       router,
-		ctx:          ctx,
-		cancel:       cancel,
+		config:           cfg,
+		logger:           appLogger,
+		db:               db,
+		streamServer:     streamServer,
+		workerPool:       workerPool,
+		alpacaStream:     alpacaStream,
+		enrichmentEngine: enrichmentEngine,
+		router:           router,
+		ctx:              ctx,
+		cancel:           cancel,
 	}
 
 	// Setup routes
@@ -260,10 +267,22 @@ func (s *Server) runDataPipeline() {
 	go func() {
 		hub := s.streamServer.GetHub()
 		for candle := range s.workerPool.GetCandleOutput() {
-			// Broadcast to WebSocket clients
-			hub.BroadcastCandle(candle.Symbol, candle.Interval, &candle)
+			// Enrich the candle with technical indicators
+			enrichedCandle, err := s.enrichCandle(&candle)
+			if err != nil {
+				s.logger.Error().Err(err).
+					Str("symbol", candle.Symbol).
+					Str("timeframe", candle.Interval).
+					Msg("Failed to enrich candle")
 
-			// Store in database for historical data
+				// Fallback: broadcast basic candle if enrichment fails
+				hub.BroadcastCandle(candle.Symbol, candle.Interval, &candle)
+			} else {
+				// Broadcast enriched candle to WebSocket clients
+				hub.BroadcastEnrichedCandle(candle.Symbol, candle.Interval, enrichedCandle)
+			}
+
+			// Store basic candle in database for historical data
 			go s.storeCandleToDatabase(repo, &candle)
 		}
 	}()
@@ -363,6 +382,53 @@ func (s *Server) convertTimeframeForDB(timeframe string) string {
 			Msg("Unknown timeframe format, defaulting to 1m")
 		return "1m"
 	}
+}
+
+// enrichCandle adds technical indicators to a basic candle
+func (s *Server) enrichCandle(candle *models.Candle) (*models.EnrichedCandle, error) {
+	// Create context with timeout for enrichment
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	// Get historical data needed for indicators (up to 50 candles for proper calculation)
+	repo, err := database.NewOHLCVRepository(s.db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create repository: %w", err)
+	}
+
+	// Convert timeframe for database query
+	dbTimeframe := s.convertTimeframeForDB(candle.Interval)
+
+	// Get recent historical candles
+	ohlcvList, err := repo.GetBySymbol(ctx, candle.Symbol, dbTimeframe, 50)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get historical data: %w", err)
+	}
+
+	// Convert current candle to OHLCV format and add to list
+	currentOHLCV := &models.OHLCV{
+		Symbol:    candle.Symbol,
+		Timestamp: candle.Timestamp,
+		Open:      candle.Open,
+		High:      candle.High,
+		Low:       candle.Low,
+		Close:     candle.Close,
+		Volume:    candle.Volume,
+		Timeframe: dbTimeframe,
+	}
+
+	// Append current candle to historical data
+	allCandles := append(ohlcvList, currentOHLCV)
+
+	// Use fast enrichment for real-time streaming to maintain performance
+	enrichmentOptions := models.FastEnrichmentOptions()
+
+	enrichedCandle, err := s.enrichmentEngine.EnrichCandle(ctx, currentOHLCV, allCandles, enrichmentOptions)
+	if err != nil {
+		return nil, fmt.Errorf("enrichment failed: %w", err)
+	}
+
+	return enrichedCandle, nil
 }
 
 // HTTP Handlers

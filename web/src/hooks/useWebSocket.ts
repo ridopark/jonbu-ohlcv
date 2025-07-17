@@ -23,6 +23,7 @@ export const useWebSocket = () => {
     timeframe, 
     setStreaming, 
     addCandle, 
+    addEnrichedCandle,
     setError 
   } = useChartStore();
 
@@ -130,6 +131,147 @@ export const useWebSocket = () => {
     }
   }, [addCandle, setError, timeframe, symbol]);
 
+  // Handle incoming enriched candle data
+  const handleEnrichedCandle = useCallback((message: any) => {
+    try {
+      console.log('🔮 Raw enriched candle message received:', message);
+      console.log('🔍 Current subscription state:', { symbol, timeframe, backendTimeframe: mapTimeframeToBackend(timeframe) });
+      console.log('🔍 Message structure analysis:', {
+        type: message.type,
+        symbol: message.symbol,
+        timeframe: message.timeframe,
+        interval: message.interval,
+        hasData: !!message.data,
+        dataKeys: message.data ? Object.keys(message.data) : null,
+        dataInterval: message.data?.interval
+      });
+      
+      // Extract the enriched data - backend sends nested structure
+      let enrichedData = message;
+      if (message.type === 'enriched_candle') {
+        enrichedData = message.data || message;
+      }
+      
+      if (enrichedData && enrichedData.ohlcv) {
+        const ohlcv = enrichedData.ohlcv;
+        const indicators = enrichedData.indicators || {};
+        const analysis = enrichedData.analysis || {};
+        
+        // Validate basic OHLCV data
+        const isValidCandle = 
+          typeof ohlcv.open === 'number' && isFinite(ohlcv.open) &&
+          typeof ohlcv.high === 'number' && isFinite(ohlcv.high) &&
+          typeof ohlcv.low === 'number' && isFinite(ohlcv.low) &&
+          typeof ohlcv.close === 'number' && isFinite(ohlcv.close) &&
+          typeof ohlcv.volume === 'number' && isFinite(ohlcv.volume);
+        
+        if (!isValidCandle) {
+          console.error('🚫 Received invalid OHLCV data in enriched candle:', ohlcv);
+          return;
+        }
+
+        // Flatten the enriched candle to match frontend type expectations
+        const flattenedCandle = {
+          // Base OHLCV properties
+          symbol: ohlcv.symbol,
+          timestamp: ohlcv.timestamp,
+          open: ohlcv.open,
+          high: ohlcv.high,
+          low: ohlcv.low,
+          close: ohlcv.close,
+          volume: ohlcv.volume,
+          interval: message.interval || ohlcv.interval || message.timeframe, // Check top-level first
+          
+          // Technical indicators
+          sma20: indicators.sma_20,
+          sma50: indicators.sma_50,
+          ema20: indicators.ema_20,
+          ema50: indicators.ema_50,
+          rsi: indicators.rsi,  // Fixed: was rsi_14, should be rsi
+          macd: indicators.macd,
+          macd_signal: indicators.macd_signal,
+          macd_histogram: indicators.macd_histogram,
+          bollinger_upper: indicators.bollinger_upper,
+          bollinger_middle: indicators.bollinger_middle,
+          bollinger_lower: indicators.bollinger_lower,
+          volume_sma: indicators.volume_sma,
+          
+          // Analysis data
+          price_change: analysis.price_change,
+          price_change_percent: analysis.price_change_percent,
+          is_green: analysis.is_green,
+          body_size: analysis.body_size,
+          upper_shadow: analysis.upper_shadow,
+          lower_shadow: analysis.lower_shadow
+        };
+
+        console.log('🎯 Frontend received enriched candle:', {
+          symbol: flattenedCandle.symbol,
+          interval: flattenedCandle.interval,
+          timestamp: flattenedCandle.timestamp,
+          indicators: Object.keys(indicators),
+          analysis: Object.keys(analysis),
+          enrichedData: {
+            sma20: flattenedCandle.sma20,
+            rsi: flattenedCandle.rsi,
+            priceChange: flattenedCandle.price_change
+          }
+        });
+        
+        // Check if candle matches current subscription
+        const backendTimeframe = mapTimeframeToBackend(timeframe);
+        
+        console.log('🔍 SUBSCRIPTION MATCH DEBUG:', {
+          flattenedCandle: {
+            symbol: flattenedCandle.symbol,
+            interval: flattenedCandle.interval,
+            intervalType: typeof flattenedCandle.interval
+          },
+          expected: {
+            symbol: symbol,
+            backendTimeframe: backendTimeframe,
+            backendTimeframeType: typeof backendTimeframe
+          },
+          symbolMatch: flattenedCandle.symbol === symbol,
+          intervalMatch: flattenedCandle.interval === backendTimeframe,
+          overallMatch: flattenedCandle.symbol === symbol && flattenedCandle.interval === backendTimeframe
+        });
+        
+        if (flattenedCandle.symbol === symbol && flattenedCandle.interval === backendTimeframe) {
+          console.log('✅ Adding enriched candle to chart store (matches current subscription)');
+          
+          // Add to enriched candles store
+          addEnrichedCandle(flattenedCandle);
+          
+          // Also add the base OHLCV data to regular candles store for chart display
+          const baseCandle = {
+            symbol: flattenedCandle.symbol,
+            timestamp: flattenedCandle.timestamp,
+            open: flattenedCandle.open,
+            high: flattenedCandle.high,
+            low: flattenedCandle.low,
+            close: flattenedCandle.close,
+            volume: flattenedCandle.volume,
+            interval: flattenedCandle.interval
+          };
+          addCandle(baseCandle);
+          
+          console.log('📊 Added both enriched and base candle to stores');
+        } else {
+          console.log('⚠️ Enriched candle does not match current subscription, ignoring', {
+            received: { symbol: flattenedCandle.symbol, interval: flattenedCandle.interval },
+            expected: { symbol, timeframe, backendTimeframe }
+          });
+        }
+      } else {
+        console.error('� Received invalid enriched candle structure:', enrichedData);
+      }
+    } catch (error) {
+      console.error('💥 Error processing enriched candle data:', error, 'Message:', message);
+      setError('Failed to process enriched candle data');
+    }
+  }, [addEnrichedCandle, addCandle, setError, timeframe, symbol]);
+
   // Handle connection status
   const handleConnection = useCallback((status: any) => {
     console.log('🔌 WebSocket connection status:', {
@@ -161,15 +303,17 @@ export const useWebSocket = () => {
   // Subscribe to WebSocket events
   useEffect(() => {
     const unsubscribeCandle = wsClient.subscribe('candle', handleCandle);
+    const unsubscribeEnrichedCandle = wsClient.subscribe('enriched_candle', handleEnrichedCandle);
     const unsubscribeConnection = wsClient.subscribe('connection', handleConnection);
     const unsubscribeError = wsClient.subscribe('error', handleError);
 
     return () => {
       unsubscribeCandle();
+      unsubscribeEnrichedCandle();
       unsubscribeConnection();
       unsubscribeError();
     };
-  }, [handleCandle, handleConnection, handleError]);
+  }, [handleCandle, handleEnrichedCandle, handleConnection, handleError]);
 
   // Handle symbol/timeframe changes
   useEffect(() => {

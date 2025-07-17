@@ -115,6 +115,19 @@ export const useChartStore = create<ChartStore>()(
       },
       
       addCandle: (candle: OHLCVCandle) => {
+        console.log('🏪 STORE: Adding candle to chart store:', {
+          symbol: candle.symbol,
+          timestamp: candle.timestamp,
+          interval: candle.interval,
+          ohlcv: {
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+            volume: candle.volume
+          }
+        });
+        
         // Validate candle data before adding to store
         if (!candle || 
             typeof candle.open !== 'number' || !isFinite(candle.open) ||
@@ -138,16 +151,21 @@ export const useChartStore = create<ChartStore>()(
         
         if (existingIndex >= 0) {
           updatedCandles[existingIndex] = candle;
+          console.log('🔄 Updated existing candle at index:', existingIndex);
         } else {
           updatedCandles.push(candle);
+          console.log('➕ Added new candle, total candles:', updatedCandles.length);
           // Keep only last 1000 candles for performance
           if (updatedCandles.length > 1000) {
             updatedCandles.shift();
           }
         }
         
+        const sortedCandles = updatedCandles.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        console.log('📊 Final candles array length:', sortedCandles.length);
+        
         set({ 
-          candles: updatedCandles.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+          candles: sortedCandles,
           lastUpdate: new Date().toISOString()
         });
       },
