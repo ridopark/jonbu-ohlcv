@@ -15,6 +15,30 @@ export interface OHLCVCandle {
   updated_at?: string;
 }
 
+export interface SupportResistanceLevel {
+  price: number;
+  type: 'support' | 'resistance';
+  strength: number; // 0-100
+  touches: number;
+  last_touch: number;
+  confidence: number; // 0-100
+}
+
+export interface CurrentLevelInfo {
+  price: number;
+  nearest_support?: SupportResistanceLevel;
+  nearest_resistance?: SupportResistanceLevel;
+  distance_to_support: number;
+  distance_to_resistance: number;
+  position: 'near_support' | 'near_resistance' | 'middle';
+}
+
+export interface SupportResistanceLevels {
+  support: SupportResistanceLevel[];
+  resistance: SupportResistanceLevel[];
+  current?: CurrentLevelInfo;
+}
+
 export interface EnrichedCandle extends OHLCVCandle {
   sma20?: number;
   sma50?: number;
@@ -34,6 +58,7 @@ export interface EnrichedCandle extends OHLCVCandle {
   body_size?: number;
   upper_shadow?: number;
   lower_shadow?: number;
+  support_resistance?: SupportResistanceLevels;
 }
 
 export type Timeframe = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
@@ -48,6 +73,10 @@ interface ChartStore {
   enrichedCandles: EnrichedCandle[];
   loading: boolean;
   error: string | null;
+  
+  // Support/Resistance levels
+  supportResistanceLevels: SupportResistanceLevels | null;
+  showSupportResistance: boolean;
   
   // Chart settings
   showIndicators: boolean;
@@ -67,6 +96,8 @@ interface ChartStore {
   addEnrichedCandle: (candle: EnrichedCandle) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setSupportResistanceLevels: (levels: SupportResistanceLevels | null) => void;
+  toggleSupportResistance: () => void;
   toggleIndicator: (indicator: string) => void;
   setChartType: (type: 'candlestick' | 'line' | 'area') => void;
   setStreaming: (streaming: boolean) => void;
@@ -85,6 +116,8 @@ export const useChartStore = create<ChartStore>()(
       enrichedCandles: [],
       loading: false,
       error: null,
+      supportResistanceLevels: null,
+      showSupportResistance: true,
       showIndicators: true,
       indicators: DEFAULT_INDICATORS,
       chartType: 'candlestick',
@@ -196,6 +229,14 @@ export const useChartStore = create<ChartStore>()(
       setLoading: (loading: boolean) => set({ loading }),
       
       setError: (error: string | null) => set({ error }),
+      
+      setSupportResistanceLevels: (supportResistanceLevels: SupportResistanceLevels | null) => 
+        set({ supportResistanceLevels }),
+      
+      toggleSupportResistance: () => {
+        const { showSupportResistance } = get();
+        set({ showSupportResistance: !showSupportResistance });
+      },
       
       toggleIndicator: (indicator: string) => {
         const { indicators } = get();

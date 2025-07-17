@@ -2,7 +2,14 @@ import React from 'react';
 import { useChartStore } from '../../stores/chartStore';
 
 const CandlestickChart: React.FC = () => {
-  const { candles, enrichedCandles, symbol, timeframe } = useChartStore();
+  const { 
+    candles, 
+    enrichedCandles, 
+    symbol, 
+    timeframe, 
+    supportResistanceLevels, 
+    showSupportResistance 
+  } = useChartStore();
   
   // Debug logging
   React.useEffect(() => {
@@ -146,6 +153,18 @@ const CandlestickChart: React.FC = () => {
               </div>
             </>
           )}
+          {showSupportResistance && supportResistanceLevels && (
+            <>
+              <div className="flex items-center gap-1 ml-4">
+                <div className="w-4 h-0.5 bg-green-500" />
+                <span>Support</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-0.5 bg-red-500" />
+                <span>Resistance</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -283,6 +302,208 @@ const CandlestickChart: React.FC = () => {
                 </g>
               );
             })()}
+            
+            {/* Support and Resistance Levels */}
+            {showSupportResistance && supportResistanceLevels && (
+              <g>
+                {/* Support Lines */}
+                {supportResistanceLevels.support?.map((level, index) => {
+                  const y = 220 - ((level.price - priceRange.min) / (priceRange.max - priceRange.min)) * 200;
+                  
+                  // Skip invalid levels
+                  if (!isFinite(y) || level.price < priceRange.min || level.price > priceRange.max) return null;
+                  
+                  // Calculate line opacity and thickness based on strength and confidence
+                  const opacity = Math.min(0.9, Math.max(0.3, level.confidence / 100));
+                  const strokeWidth = Math.max(1.5, Math.min(4, level.strength / 25));
+                  
+                  return (
+                    <g key={`support-${index}`}>
+                      {/* Support zone background */}
+                      <rect
+                        x="10"
+                        y={y - 2}
+                        width="980"
+                        height="4"
+                        fill="rgb(34, 197, 94)"
+                        opacity={0.1}
+                      />
+                      
+                      {/* Main support line */}
+                      <line
+                        x1="10"
+                        y1={y}
+                        x2="990"
+                        y2={y}
+                        stroke="rgb(34, 197, 94)"
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={level.confidence > 70 ? "0" : "8,4"}
+                        opacity={opacity}
+                      />
+                      
+                      {/* Touch point indicators */}
+                      {Array.from({ length: Math.min(level.touches, 5) }, (_, i) => (
+                        <circle
+                          key={`touch-${i}`}
+                          cx={100 + i * 180}
+                          cy={y}
+                          r="3"
+                          fill="rgb(34, 197, 94)"
+                          opacity={0.8}
+                        />
+                      ))}
+                      
+                      {/* Support label with enhanced styling */}
+                      <g>
+                        <rect
+                          x="880"
+                          y={y - 20}
+                          width="115"
+                          height="16"
+                          fill="rgb(34, 197, 94)"
+                          opacity={0.9}
+                          rx="2"
+                        />
+                        <text
+                          x="888"
+                          y={y - 8}
+                          className="text-xs font-medium"
+                          fill="white"
+                        >
+                          SUP {formatPrice(level.price)}
+                        </text>
+                        <text
+                          x="888"
+                          y={y + 14}
+                          className="text-xs"
+                          fill="rgb(34, 197, 94)"
+                          opacity={0.8}
+                        >
+                          {level.touches}x • {level.confidence.toFixed(0)}%
+                        </text>
+                      </g>
+                    </g>
+                  );
+                })}
+                
+                {/* Resistance Lines */}
+                {supportResistanceLevels.resistance?.map((level, index) => {
+                  const y = 220 - ((level.price - priceRange.min) / (priceRange.max - priceRange.min)) * 200;
+                  
+                  // Skip invalid levels
+                  if (!isFinite(y) || level.price < priceRange.min || level.price > priceRange.max) return null;
+                  
+                  // Calculate line opacity and thickness based on strength and confidence
+                  const opacity = Math.min(0.9, Math.max(0.3, level.confidence / 100));
+                  const strokeWidth = Math.max(1.5, Math.min(4, level.strength / 25));
+                  
+                  return (
+                    <g key={`resistance-${index}`}>
+                      {/* Resistance zone background */}
+                      <rect
+                        x="10"
+                        y={y - 2}
+                        width="980"
+                        height="4"
+                        fill="rgb(239, 68, 68)"
+                        opacity={0.1}
+                      />
+                      
+                      {/* Main resistance line */}
+                      <line
+                        x1="10"
+                        y1={y}
+                        x2="990"
+                        y2={y}
+                        stroke="rgb(239, 68, 68)"
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={level.confidence > 70 ? "0" : "8,4"}
+                        opacity={opacity}
+                      />
+                      
+                      {/* Touch point indicators */}
+                      {Array.from({ length: Math.min(level.touches, 5) }, (_, i) => (
+                        <circle
+                          key={`touch-${i}`}
+                          cx={100 + i * 180}
+                          cy={y}
+                          r="3"
+                          fill="rgb(239, 68, 68)"
+                          opacity={0.8}
+                        />
+                      ))}
+                      
+                      {/* Resistance label with enhanced styling */}
+                      <g>
+                        <rect
+                          x="880"
+                          y={y + 6}
+                          width="115"
+                          height="16"
+                          fill="rgb(239, 68, 68)"
+                          opacity={0.9}
+                          rx="2"
+                        />
+                        <text
+                          x="888"
+                          y={y + 18}
+                          className="text-xs font-medium"
+                          fill="white"
+                        >
+                          RES {formatPrice(level.price)}
+                        </text>
+                        <text
+                          x="888"
+                          y={y - 2}
+                          className="text-xs"
+                          fill="rgb(239, 68, 68)"
+                          opacity={0.8}
+                        >
+                          {level.touches}x • {level.confidence.toFixed(0)}%
+                        </text>
+                      </g>
+                    </g>
+                  );
+                })}
+                
+                {/* Current price position indicator */}
+                {supportResistanceLevels.current && (
+                  <g>
+                    {/* Position status banner */}
+                    <rect
+                      x="350"
+                      y="5"
+                      width="300"
+                      height="20"
+                      fill={
+                        supportResistanceLevels.current.position === 'near_support' ? 'rgb(34, 197, 94)' :
+                        supportResistanceLevels.current.position === 'near_resistance' ? 'rgb(239, 68, 68)' :
+                        'rgb(59, 130, 246)'
+                      }
+                      opacity={0.1}
+                      rx="4"
+                    />
+                    <text
+                      x="500"
+                      y="18"
+                      className="text-sm font-medium"
+                      fill={
+                        supportResistanceLevels.current.position === 'near_support' ? 'rgb(34, 197, 94)' :
+                        supportResistanceLevels.current.position === 'near_resistance' ? 'rgb(239, 68, 68)' :
+                        'rgb(59, 130, 246)'
+                      }
+                      textAnchor="middle"
+                    >
+                      {supportResistanceLevels.current.position.replace('_', ' ').toUpperCase()}
+                      {supportResistanceLevels.current.distance_to_support > 0 && 
+                        ` (${supportResistanceLevels.current.distance_to_support.toFixed(1)}% from SUP)`}
+                      {supportResistanceLevels.current.distance_to_resistance > 0 && 
+                        ` (${supportResistanceLevels.current.distance_to_resistance.toFixed(1)}% to RES)`}
+                    </text>
+                  </g>
+                )}
+              </g>
+            )}
             
             {/* Price labels */}
             <g className="text-xs fill-current text-muted-foreground">

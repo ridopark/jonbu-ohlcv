@@ -422,6 +422,12 @@ func (s *Server) enrichCandle(candle *models.Candle) (*models.EnrichedCandle, er
 
 	// Use fast enrichment for real-time streaming to maintain performance
 	enrichmentOptions := models.FastEnrichmentOptions()
+	// Enable trend indicators for SMA and EMA display
+	enrichmentOptions.TrendIndicators = true
+	// Enable support/resistance for enhanced chart analysis
+	enrichmentOptions.SupportResistance = true
+	// Enable volatility indicators for ATR, Bollinger Bands, etc.
+	enrichmentOptions.VolatilityIndicators = true
 
 	enrichedCandle, err := s.enrichmentEngine.EnrichCandle(ctx, currentOHLCV, allCandles, enrichmentOptions)
 	if err != nil {

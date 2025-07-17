@@ -24,6 +24,7 @@ export const useWebSocket = () => {
     setStreaming, 
     addCandle, 
     addEnrichedCandle,
+    setSupportResistanceLevels,
     setError 
   } = useChartStore();
 
@@ -170,8 +171,8 @@ export const useWebSocket = () => {
           return;
         }
 
-        // Flatten the enriched candle to match frontend type expectations
-        const flattenedCandle = {
+        // Preserve the nested structure instead of flattening
+        const enrichedCandle = {
           // Base OHLCV properties
           symbol: ohlcv.symbol,
           timestamp: ohlcv.timestamp,
@@ -182,39 +183,34 @@ export const useWebSocket = () => {
           volume: ohlcv.volume,
           interval: message.interval || ohlcv.interval || message.timeframe, // Check top-level first
           
-          // Technical indicators
-          sma20: indicators.sma_20,
-          sma50: indicators.sma_50,
-          ema20: indicators.ema_20,
-          ema50: indicators.ema_50,
-          rsi: indicators.rsi,  // Fixed: was rsi_14, should be rsi
-          macd: indicators.macd,
-          macd_signal: indicators.macd_signal,
-          macd_histogram: indicators.macd_histogram,
-          bollinger_upper: indicators.bollinger_upper,
-          bollinger_middle: indicators.bollinger_middle,
-          bollinger_lower: indicators.bollinger_lower,
-          volume_sma: indicators.volume_sma,
-          
-          // Analysis data
-          price_change: analysis.price_change,
-          price_change_percent: analysis.price_change_percent,
-          is_green: analysis.is_green,
-          body_size: analysis.body_size,
-          upper_shadow: analysis.upper_shadow,
-          lower_shadow: analysis.lower_shadow
+          // Preserve nested structure for frontend access
+          data: {
+            indicators: indicators,
+            analysis: analysis,
+            signals: enrichedData.signals || {}
+          }
         };
 
+        // Extract and update support/resistance levels for chart display
+        if (analysis.support_resistance) {
+          setSupportResistanceLevels(analysis.support_resistance);
+          console.log('📈 Updated support/resistance levels:', {
+            supportCount: analysis.support_resistance.support?.length || 0,
+            resistanceCount: analysis.support_resistance.resistance?.length || 0,
+            currentPosition: analysis.support_resistance.current?.position || 'unknown'
+          });
+        }
+
         console.log('🎯 Frontend received enriched candle:', {
-          symbol: flattenedCandle.symbol,
-          interval: flattenedCandle.interval,
-          timestamp: flattenedCandle.timestamp,
+          symbol: enrichedCandle.symbol,
+          interval: enrichedCandle.interval,
+          timestamp: enrichedCandle.timestamp,
           indicators: Object.keys(indicators),
           analysis: Object.keys(analysis),
           enrichedData: {
-            sma20: flattenedCandle.sma20,
-            rsi: flattenedCandle.rsi,
-            priceChange: flattenedCandle.price_change
+            sma20: indicators.sma_20,
+            rsi: indicators.rsi,
+            priceChange: analysis.price_change
           }
         });
         
@@ -222,44 +218,44 @@ export const useWebSocket = () => {
         const backendTimeframe = mapTimeframeToBackend(timeframe);
         
         console.log('🔍 SUBSCRIPTION MATCH DEBUG:', {
-          flattenedCandle: {
-            symbol: flattenedCandle.symbol,
-            interval: flattenedCandle.interval,
-            intervalType: typeof flattenedCandle.interval
+          enrichedCandle: {
+            symbol: enrichedCandle.symbol,
+            interval: enrichedCandle.interval,
+            intervalType: typeof enrichedCandle.interval
           },
           expected: {
             symbol: symbol,
             backendTimeframe: backendTimeframe,
             backendTimeframeType: typeof backendTimeframe
           },
-          symbolMatch: flattenedCandle.symbol === symbol,
-          intervalMatch: flattenedCandle.interval === backendTimeframe,
-          overallMatch: flattenedCandle.symbol === symbol && flattenedCandle.interval === backendTimeframe
+          symbolMatch: enrichedCandle.symbol === symbol,
+          intervalMatch: enrichedCandle.interval === backendTimeframe,
+          overallMatch: enrichedCandle.symbol === symbol && enrichedCandle.interval === backendTimeframe
         });
         
-        if (flattenedCandle.symbol === symbol && flattenedCandle.interval === backendTimeframe) {
+        if (enrichedCandle.symbol === symbol && enrichedCandle.interval === backendTimeframe) {
           console.log('✅ Adding enriched candle to chart store (matches current subscription)');
           
           // Add to enriched candles store
-          addEnrichedCandle(flattenedCandle);
+          addEnrichedCandle(enrichedCandle);
           
           // Also add the base OHLCV data to regular candles store for chart display
           const baseCandle = {
-            symbol: flattenedCandle.symbol,
-            timestamp: flattenedCandle.timestamp,
-            open: flattenedCandle.open,
-            high: flattenedCandle.high,
-            low: flattenedCandle.low,
-            close: flattenedCandle.close,
-            volume: flattenedCandle.volume,
-            interval: flattenedCandle.interval
+            symbol: enrichedCandle.symbol,
+            timestamp: enrichedCandle.timestamp,
+            open: enrichedCandle.open,
+            high: enrichedCandle.high,
+            low: enrichedCandle.low,
+            close: enrichedCandle.close,
+            volume: enrichedCandle.volume,
+            interval: enrichedCandle.interval
           };
           addCandle(baseCandle);
           
           console.log('📊 Added both enriched and base candle to stores');
         } else {
           console.log('⚠️ Enriched candle does not match current subscription, ignoring', {
-            received: { symbol: flattenedCandle.symbol, interval: flattenedCandle.interval },
+            received: { symbol: enrichedCandle.symbol, interval: enrichedCandle.interval },
             expected: { symbol, timeframe, backendTimeframe }
           });
         }
